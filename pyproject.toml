@@ -1,0 +1,28 @@
+[project]
+name = "mujoco_ravens"
+version = "0.0.0"
+description = "Simulation environments for basic manipulation tasks."
+authors = [
+	{ name = "Peter David Fagan", email = "peterdavidfagan@gmail.com" }
+]
+readme = "README.md"
+
+[tool.poetry]
+name = "mujoco_ravens"
+version = "0.0.0"
+description = "Simulation environments for basic manipulation tasks."
+license = "Apache-2.0"
+authors = [
+	"Peter David Fagan <peterdavidfagan@gmail.com>"
+]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.10.6"
+mujoco = "2.3.7"
+
+[tool.black]
+line-length = 120
+
+[tool.flake8]
+max-line-length = 120
