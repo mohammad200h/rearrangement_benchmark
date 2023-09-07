@@ -10,8 +10,7 @@ from models.arms import franka_emika
 from dm_robotics.moma import robot
 from dm_robotics.moma.models.end_effectors.robot_hands import robotiq_2f85
 from dm_robotics.moma.models.robots.robot_arms import robot_arm
-from dm_robotics.moma.models.robots.robot_arms import sawyer
-from dm_robotics.moma.models.robots.robot_arms import sawyer_constants
+from dm_robotics.moma.models.arenas import empty
 
 # robot hardware
 from dm_robotics.moma import sensor
@@ -24,13 +23,13 @@ from dm_control import composer, mjcf, mujoco
 import PIL.Image
 
 def render_scene(physics: mjcf.Physics) -> np.ndarray:
-  camera = mujoco.MovableCamera(physics, height=360, width=480)
-  camera.set_pose([0, 0, 0], 2.5, 180, -35)
+  camera = mujoco.MovableCamera(physics, height=480, width=480)
+  camera.set_pose([0, 0, 0.75], 2.5, 180, -30)
   return camera.render()
 
 def build_arena(name: str) -> composer.Arena:
     """Build a MuJoCo arena."""
-    arena = composer.Arena()
+    arena = empty.Arena(name=name)
     arena.mjcf_model.option.timestep = 0.001
     arena.mjcf_model.option.gravity = (0., 0., -1.0)
     arena.mjcf_model.size.nconmax = 1000
