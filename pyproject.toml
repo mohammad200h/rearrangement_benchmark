@@ -19,7 +19,16 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "3.10.6"
-mujoco = "2.3.7"
+mujoco = "^2.3.0"
+dm-control = "1.0.9"
+dm_robotics-moma = "0.5.0"
+dm_robotics-transformations = "0.5.0"
+dm_robotics-agentflow = "0.5.0" 
+dm_robotics-geometry = "0.5.0"
+dm_robotics-manipulation = "0.5.0" 
+dm_robotics-controllers = "0.5.0"
+
+pillow = "10.0.0"
 
 [tool.black]
 line-length = 120
