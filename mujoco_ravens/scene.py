@@ -22,7 +22,7 @@ from dm_robotics.moma import prop
 from dm_robotics.moma import sensor
 from dm_robotics.moma.sensors.camera_sensor import CameraImageSensor
 from dm_robotics.moma import effector
-from dm_robotics.moma.effectors import arm_effector
+from dm_robotics.moma.effectors import arm_effector, default_gripper_effector
 
 # physics
 from dm_control import composer, mjcf, mujoco
@@ -90,8 +90,10 @@ if __name__=="__main__":
             action_range_override=None,
             robot_name = "franka_emika_panda",
             )
-
-    #gripper_effector = arm_effector.GripperEffector(gripper)
+    gripper_hardware_interface = default_gripper_effector.DefaultGripperEffector(
+            gripper,
+            robot_name = "robotiq_2f85",
+            )
 
     # Try running the effectors in a loop.
     num_steps = int(1. / physics.timestep())  # run for a second
@@ -105,11 +107,13 @@ if __name__=="__main__":
             min_control,
             max_control,
             ).squeeze().__array__()
+    gripper_command = np.array([255.0], dtype=np.float32) # close the gripper
 
     for _ in range(num_steps):
       arm_hardware_interface.set_control(physics, arm_command)
+      gripper_hardware_interface.set_control(physics, gripper_command)
       physics.step()
-
+    
     # Visualize the new state of things.
     after = render_scene(physics)
     after = PIL.Image.fromarray(after)
