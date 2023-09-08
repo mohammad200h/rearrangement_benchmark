@@ -47,7 +47,6 @@ class FER(robot_arm.RobotArm):
     def attachment_site(self):
         return self._attachment_site
 
-    @property
     def set_joint_angles(self, physics: mjcf.Physics, qpos: np.ndarray) -> None:
         physics.bind(self._joints).qpos = qpos
     
