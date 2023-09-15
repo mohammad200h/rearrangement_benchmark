@@ -2,6 +2,7 @@
 
 import enum
 from typing import Dict, Sequence, Tuple, Union
+from dataclasses import dataclass, field
 
 import numpy as np
 import jax
@@ -51,6 +52,44 @@ import PIL.Image
 # custom props
 from props import Block, Cylinder, Sphere
 
+import random
+import numpy as np
+import jax
+import jax.numpy as jnp
+
+
+@dataclass
+class Colours:
+    """Colour values for the objects in the scene."""
+    colour_map: Dict[str, Tuple[float, float, float, float]] = field(
+        default_factory=lambda: {
+            "red": (1.0, 0.0, 0.0, 1.0),
+            "green": (0.0, 1.0, 0.0, 1.0),
+            "blue": (0.0, 0.0, 1.0, 1.0),
+            "yellow": (1.0, 1.0, 0.0, 1.0),
+            "cyan": (0.0, 1.0, 1.0, 1.0),
+            "magenta": (1.0, 0.0, 1.0, 1.0),
+            "white": (1.0, 1.0, 1.0, 1.0),
+            "black": (0.0, 0.0, 0.0, 1.0),
+            "grey": (0.5, 0.5, 0.5, 1.0),
+            "orange": (1.0, 0.5, 0.0, 1.0),
+            "purple": (0.5, 0.0, 0.5, 1.0),
+            "brown": (0.5, 0.25, 0.0, 1.0),
+            "pink": (1.0, 0.75, 0.8, 1.0),
+            })
+
+    @property
+    def colour_names(self) -> Sequence[str]:
+        """Return the names of the colours."""
+        return list(self.colour_map.keys())
+
+    def sample_colour(self,) -> Tuple[float, float, float, float]:
+        """Sample a random colour."""
+        return self.colour_map[random.choice(self.colour_names)]
+
+colours = Colours()
+MIN_OBJECT_SIZE = 0.02
+MAX_OBJECT_SIZE = 0.15
 
 def render_scene(physics: mjcf.Physics) -> np.ndarray:
   camera = mujoco.MovableCamera(physics, height=480, width=480)
@@ -90,17 +129,29 @@ def _add_block(
         height: float = 0.1,
         depth: float = 0.1,
         rgba: Tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0),
+        sample: bool = False,
+        seed: int = 0,
         ) -> composer.Entity:
-  block = Block(
+    if sample:
+        # sample block dimensions
+        width = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
+        height = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
+        depth = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
+
+        # sample block color
+        rgba = colours.sample_colour()
+
+    # create block and add to arena
+    block = Block(
         name=name,
         width=width,
         height=height,
         depth=depth,
-        rgba=rgba,
-          )
-  frame = arena.add_free_entity(block)
-  block.set_freejoint(frame.freejoint)
-  return block
+        rgba=rgba)
+    frame = arena.add_free_entity(block)
+    block.set_freejoint(frame.freejoint)
+    
+    return block
 
 def _add_cylinder(
         arena: composer.Arena,
@@ -108,34 +159,63 @@ def _add_cylinder(
         radius: float = 0.01,
         half_height: float = 0.01,
         rgba: Tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0),
+        sample: bool = False,
         ) -> composer.Entity:
-  cylinder = Cylinder(
+    if sample:
+        # sample cylinder dimensions
+        radius = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
+        half_height = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
+
+        # sample cylinder color
+        rgba = colours.sample_colour()
+
+    # create cylinder and add to arena
+    cylinder = Cylinder(
         name=name,
         radius=radius,
         half_height=half_height,
-        rgba=rgba,
-          )
-  frame = arena.add_free_entity(cylinder)
-  cylinder.set_freejoint(frame.freejoint)
-  return cylinder
+        rgba=rgba)
+
+    frame = arena.add_free_entity(cylinder)
+    cylinder.set_freejoint(frame.freejoint)
+    return cylinder
 
 def _add_sphere(
         arena: composer.Arena,
         name: str = "sphere",
         radius: float = 0.01,
         rgba: Tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0),
+        sample: bool = False,
+        seed: int = 0,
         ) -> composer.Entity:
-  sphere = Sphere(radius=0.5)
-  frame = arena.add_free_entity(sphere)
-  sphere.set_freejoint(frame.freejoint)
-  return sphere
+    if sample:
+        # sample sphere dimensions
+        radius = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
+
+        # sample sphere color
+        rgba = colours.sample_colour()
+    
+    # create sphere and add to arena
+    sphere = Sphere(
+            radius=radius,
+            rgba=rgba)
+    frame = arena.add_free_entity(sphere)
+    sphere.set_freejoint(frame.freejoint)
+    return sphere
 
 #TODO (add basic samplers for number of each object shape and their colours)
 
 
 if __name__=="__main__":
     
+    key = jax.random.PRNGKey(0)
+    keys = jax.random.split(key, 3)
+
     ## Build base scene ##
+    NUM_BLOCKS = random.randint(0, 3)
+    NUM_CYLINDERS = random.randint(0, 3)
+    NUM_SPHERES = random.randint(0, 3)
+
 
     # build the base arena
     arena = build_arena("test")
@@ -144,9 +224,16 @@ if __name__=="__main__":
     arm, gripper = add_robot_and_gripper(arena)
 
     # add objects to the arena
-    block = _add_block(arena)
-    cylinder = _add_cylinder(arena)
-    sphere = _add_sphere(arena)
+    extra_sensors = []
+    for i in range(NUM_BLOCKS):
+        block = _add_block(arena, sample=True)
+        extra_sensors.append(prop_pose_sensor.PropPoseSensor(block, name=f'block_{i}'))
+    for i in range(NUM_CYLINDERS):
+        cylinder = _add_cylinder(arena, sample=True)
+        extra_sensors.append(prop_pose_sensor.PropPoseSensor(cylinder, name=f'cylinder_{i}'))
+    for i in range(NUM_SPHERES):
+        sphere = _add_sphere(arena, sample=True)
+        extra_sensors.append(prop_pose_sensor.PropPoseSensor(sphere, name=f'sphere_{i}'))
 
     physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)
     
@@ -194,14 +281,13 @@ if __name__=="__main__":
             gripper_effector=gripper_hardware_interface,
             )
 
-    block_pose_sensor = prop_pose_sensor.PropPoseSensor(block, name='block')
 
     task = base_task.BaseTask(
             task_name="test",
             arena=arena,
             robots=[fer_and_gripper],
             props=[block],
-            extra_sensors=[block_pose_sensor],
+            extra_sensors=extra_sensors,
             extra_effectors=[],
             control_timestep=0.1,
             scene_initializer=lambda _: None,
