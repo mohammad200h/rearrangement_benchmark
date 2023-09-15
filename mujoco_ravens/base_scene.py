@@ -25,6 +25,7 @@ from dm_robotics.moma import sensor
 from dm_robotics.moma.sensors.camera_sensor import CameraImageSensor
 from dm_robotics.moma.sensors import prop_pose_sensor
 from dm_robotics.moma.sensors import robot_arm_sensor
+from dm_robotics.moma.sensors import robot_tcp_sensor
 from dm_robotics.moma.sensors import robotiq_gripper_sensor
 from dm_robotics.moma import effector
 from dm_robotics.moma.effectors import arm_effector, default_gripper_effector
@@ -46,6 +47,9 @@ from dm_control.composer.observation import observable
 # visualization
 import matplotlib.pyplot as plt
 import PIL.Image
+
+# custom props
+from props import Block, Cylinder, Sphere
 
 
 def render_scene(physics: mjcf.Physics) -> np.ndarray:
@@ -79,70 +83,60 @@ def add_robot_and_gripper(arena: composer.Arena) -> Tuple[composer.Entity, compo
     
     return arm, gripper
 
-@enum.unique
-class GripperPoseObservations(enum.Enum):
-  """Observations exposed by this sensor.
-  
-  Typically, for each MoMa sensor we provide a corresponding enum that tracks
-  all the available observations for the sensor. It helps with programatically
-  fetching observations later when we get to the RL environment.
-  """
-  # The world x,y,z position of the gripper's tool-center-point.
-  POS = '{}_pos'
-  # The world orientation quaternion of the gripper's tool-center-point.
-  QUAT = '{}_quat'
-
-  def get_obs_key(self, name: str) -> str:
-    """Returns the key to the observation in the observables dict."""
-    return self.value.format(name)
-
-class GripperPoseSensor(sensor.Sensor[GripperPoseObservations]):
-
-  def __init__(self, gripper: robot_hand.RobotHand, name: str):
-    self._gripper = gripper
-    self._name = name
-
-    # Mapping of observation names to the composer observables (callables that
-    # will produce numpy arrays containing the observations).
-    self._observables = {
-        self.get_obs_key(GripperPoseObservations.POS):
-            observable.Generic(self._pos),
-        self.get_obs_key(GripperPoseObservations.QUAT):
-            observable.Generic(self._quat),
-    }
-    for obs in self._observables.values():
-      obs.enabled = True
-
-  def initialize_episode(self, physics: mjcf.Physics,
-                         random_state: np.random.RandomState) -> None:
-    pass  # Nothing special needed each episode.
-
-  @property
-  def observables(self) -> Dict[str, observable.Observable]:
-    return self._observables
-
-  @property
-  def name(self) -> str:
-    return self._name
-
-  def get_obs_key(self, obs: GripperPoseObservations) -> str:
-    return obs.get_obs_key(self._name)
-
-  def _pos(self, physics: mjcf.Physics) -> np.ndarray:
-    return physics.bind(self._gripper.tool_center_point).xpos
-
-  def _quat(self, physics: mjcf.Physics) -> np.ndarray:
-    rmat = physics.bind(self._gripper.tool_center_point).xmat
-    quat = transformations.mat_to_quat(np.reshape(rmat, [3, 3]))
-    return transformations.positive_leading_quat(quat)
-
-def _add_block(arena: composer.Arena) -> composer.Entity:
-  block = prop.Block()
+def _add_block(
+        arena: composer.Arena,
+        name: str = "block",    
+        width: float = 0.1,
+        height: float = 0.1,
+        depth: float = 0.1,
+        rgba: Tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0),
+        ) -> composer.Entity:
+  block = Block(
+        name=name,
+        width=width,
+        height=height,
+        depth=depth,
+        rgba=rgba,
+          )
   frame = arena.add_free_entity(block)
   block.set_freejoint(frame.freejoint)
   return block
 
+def _add_cylinder(
+        arena: composer.Arena,
+        name: str = "cylinder",
+        radius: float = 0.01,
+        half_height: float = 0.01,
+        rgba: Tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0),
+        ) -> composer.Entity:
+  cylinder = Cylinder(
+        name=name,
+        radius=radius,
+        half_height=half_height,
+        rgba=rgba,
+          )
+  frame = arena.add_free_entity(cylinder)
+  cylinder.set_freejoint(frame.freejoint)
+  return cylinder
+
+def _add_sphere(
+        arena: composer.Arena,
+        name: str = "sphere",
+        radius: float = 0.01,
+        rgba: Tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0),
+        ) -> composer.Entity:
+  sphere = Sphere(radius=0.5)
+  frame = arena.add_free_entity(sphere)
+  sphere.set_freejoint(frame.freejoint)
+  return sphere
+
+#TODO (add basic samplers for number of each object shape and their colours)
+
+
 if __name__=="__main__":
+    
+    ## Build base scene ##
+
     # build the base arena
     arena = build_arena("test")
 
@@ -151,11 +145,12 @@ if __name__=="__main__":
 
     # add objects to the arena
     block = _add_block(arena)
+    cylinder = _add_cylinder(arena)
+    sphere = _add_sphere(arena)
 
-    # visualize the current scene
     physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)
-    image = PIL.Image.fromarray(render_scene(physics))
-    #image.show()
+    
+    ## Robot hardware ##
 
     # interface for robot control
     arm_hardware_interface = arm_effector.ArmEffector(
@@ -168,48 +163,25 @@ if __name__=="__main__":
             robot_name = "robotiq_2f85",
             )
 
-    # try running control.
-    num_steps = int(1. / physics.timestep())  # run for a second
-    min_control = arm_hardware_interface.action_spec(physics).minimum
-    max_control = arm_hardware_interface.action_spec(physics).maximum
-    key = random.PRNGKey(0)
-    arm_command = jax.vmap(random.uniform, in_axes=(None, None, None, 0, 0), out_axes=0)(
-            key,
-            (1,),
-            jnp.float32,
-            min_control,
-            max_control,
-            ).squeeze().__array__()
-    gripper_command = np.array([255.0], dtype=np.float32) # close the gripper
-
-    for _ in range(num_steps):
-      arm_hardware_interface.set_control(physics, arm_command)
-      gripper_hardware_interface.set_control(physics, gripper_command)
-      physics.step()
-    
-    # visualize the new state of things.
-    after = render_scene(physics)
-    after = PIL.Image.fromarray(after)
-    #after.show()
-
     # robot sensors
+    arm_sensor = robot_arm_sensor.RobotArmSensor(
+                arm,
+                name="franka_emika_panda",
+                have_torque_sensors=True,
+                )
     gripper_sensor = robotiq_gripper_sensor.RobotiqGripperSensor(
             gripper,
             name="robotiq_2f85",
             )
-    gripper_pose_sensor = GripperPoseSensor(
-            gripper_sensor,
-            name="robotiq_2f85_pose",
-            )
+    gripper_tcp_sensor = robot_tcp_sensor.RobotTCPSensor(gripper, name="robotiq_2f85")
+    
+
+    ## Task Definition ##
 
     # try set up task logic
     robot_sensors = [
-            robot_arm_sensor.RobotArmSensor(
-                arm,
-                name="franka_emika_panda",
-                have_torque_sensors=True,
-                ),
-            gripper_pose_sensor,
+            arm_sensor,
+            gripper_tcp_sensor,
             gripper_sensor,
     ]
 
