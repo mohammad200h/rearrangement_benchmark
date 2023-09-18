@@ -1,11 +1,14 @@
 """A script for defining props."""
 
+import random   
 from typing import Dict, Sequence, Tuple, Union, List
 from dataclasses import dataclass, field
 
 from dm_robotics.moma.prop import Prop
-from dm_control import mjcf
+from dm_robotics.moma.sensors import prop_pose_sensor
+from dm_control import composer, mjcf
 
+import numpy as np
 
 ## Prop Models ##
 
