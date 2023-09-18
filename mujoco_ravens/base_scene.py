@@ -51,16 +51,12 @@ import PIL.Image
 
 # custom props
 from props import add_objects
+from visualization import render_scene
 
 import random
 import numpy as np
 import jax
 import jax.numpy as jnp
-
-def render_scene(physics: mjcf.Physics) -> np.ndarray:
-  camera = mujoco.MovableCamera(physics, height=480, width=480)
-  camera.set_pose([0.0, 0, 0.0], 2.5, 180, -30)
-  return camera.render()
 
 def build_arena(name: str) -> composer.Arena:
     """Build a MuJoCo arena."""
