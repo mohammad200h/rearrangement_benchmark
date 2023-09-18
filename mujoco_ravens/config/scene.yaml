@@ -1,0 +1,4 @@
+defaults:
+  - props: default
+  - robots: default
+  - task: default
