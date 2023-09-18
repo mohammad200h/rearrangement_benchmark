@@ -120,7 +120,17 @@ def construct_base_scene(cfg: DictConfig) -> None:
     physics.step()
 
     # visualize the scene
-    render_scene(physics)
+    if cfg.visualize_base_scene:
+        render_scene(physics)
+
+    return {
+            "arena": arena,
+            "physics": physics,
+            "arm": arm,
+            "gripper": gripper,
+            "props": props,
+            "extra_sensors": extra_sensors
+            }
 
 if __name__=="__main__":
 

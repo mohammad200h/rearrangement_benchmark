@@ -1,3 +1,5 @@
+visualize_base_scene: False
+
 defaults:
   - props: default
   - robots: default

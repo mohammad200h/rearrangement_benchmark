@@ -42,7 +42,7 @@ def _make_block_model(name,
       type='sphere',
       rgba=(0.1, 0.1, 0.1, 0.8),
       size=(0.002,),
-      pos=(0, 0, 0),
+      pos=(1.0, 0, 0),
       euler=(0, 0, 0))  # Was (np.pi, 0, np.pi / 2)
   del box
 
