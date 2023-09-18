@@ -50,42 +50,12 @@ import matplotlib.pyplot as plt
 import PIL.Image
 
 # custom props
-from props import Block, Cylinder, Sphere
+from props import add_objects
 
 import random
 import numpy as np
 import jax
 import jax.numpy as jnp
-
-
-@dataclass
-class Colours:
-    """Colour values for the objects in the scene."""
-    colour_map: Dict[str, Tuple[float, float, float, float]] = field(
-        default_factory=lambda: {
-            "red": (1.0, 0.0, 0.0, 1.0),
-            "green": (0.0, 1.0, 0.0, 1.0),
-            "blue": (0.0, 0.0, 1.0, 1.0),
-            "yellow": (1.0, 1.0, 0.0, 1.0),
-            "cyan": (0.0, 1.0, 1.0, 1.0),
-            "magenta": (1.0, 0.0, 1.0, 1.0),
-            "white": (1.0, 1.0, 1.0, 1.0),
-            "black": (0.0, 0.0, 0.0, 1.0),
-            "grey": (0.5, 0.5, 0.5, 1.0),
-            "orange": (1.0, 0.5, 0.0, 1.0),
-            "purple": (0.5, 0.0, 0.5, 1.0),
-            "brown": (0.5, 0.25, 0.0, 1.0),
-            "pink": (1.0, 0.75, 0.8, 1.0),
-            })
-
-    @property
-    def colour_names(self) -> Sequence[str]:
-        """Return the names of the colours."""
-        return list(self.colour_map.keys())
-
-    def sample_colour(self,) -> Tuple[float, float, float, float]:
-        """Sample a random colour."""
-        return self.colour_map[random.choice(self.colour_names)]
 
 def render_scene(physics: mjcf.Physics) -> np.ndarray:
   camera = mujoco.MovableCamera(physics, height=480, width=480)
@@ -118,128 +88,11 @@ def add_robot_and_gripper(arena: composer.Arena) -> Tuple[composer.Entity, compo
     
     return arm, gripper
 
-colours = Colours()
-MIN_OBJECT_SIZE = 0.02
-MAX_OBJECT_SIZE = 0.05
-
-def _add_block(
-        arena: composer.Arena,
-        name: str = "block",    
-        width: float = 0.1,
-        height: float = 0.1,
-        depth: float = 0.1,
-        rgba: Tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0),
-        sample: bool = False,
-        seed: int = 0,
-        ) -> composer.Entity:
-    if sample:
-        # sample block dimensions
-        width = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
-        height = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
-        depth = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
-
-        # sample block color
-        rgba = colours.sample_colour()
-
-    # create block and add to arena
-    block = Block(
-        name=name,
-        width=width,
-        height=height,
-        depth=depth,
-        rgba=rgba)
-    frame = arena.add_free_entity(block)
-    block.set_freejoint(frame.freejoint)
-    
-    return block
-
-def _add_cylinder(
-        arena: composer.Arena,
-        name: str = "cylinder",
-        radius: float = 0.01,
-        half_height: float = 0.01,
-        rgba: Tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0),
-        sample: bool = False,
-        ) -> composer.Entity:
-    if sample:
-        # sample cylinder dimensions
-        radius = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
-        half_height = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
-
-        # sample cylinder color
-        rgba = colours.sample_colour()
-
-    # create cylinder and add to arena
-    cylinder = Cylinder(
-        name=name,
-        radius=radius,
-        half_height=half_height,
-        rgba=rgba)
-
-    frame = arena.add_free_entity(cylinder)
-    cylinder.set_freejoint(frame.freejoint)
-    return cylinder
-
-def _add_sphere(
-        arena: composer.Arena,
-        name: str = "sphere",
-        radius: float = 0.01,
-        rgba: Tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0),
-        sample: bool = False,
-        seed: int = 0,
-        ) -> composer.Entity:
-    if sample:
-        # sample sphere dimensions
-        radius = np.random.uniform(MIN_OBJECT_SIZE, MAX_OBJECT_SIZE)
-
-        # sample sphere color
-        rgba = colours.sample_colour()
-    
-    # create sphere and add to arena
-    sphere = Sphere(
-            radius=radius,
-            rgba=rgba)
-    frame = arena.add_free_entity(sphere)
-    sphere.set_freejoint(frame.freejoint)
-    return sphere
-
-def _add_object(area: composer.Arena, name: str, sample: bool = False) -> composer.Entity:
-    """Add an object to the arena based on object_type."""
-
-    if name == 'block':
-        return _add_block(area, sample=sample)
-    elif name == 'cylinder':
-        return _add_cylinder(area, sample=sample)
-    elif name == 'sphere':
-        return _add_sphere(area, sample=sample)
-    else:
-        raise ValueError(f'Unknown object type {name}')
-
-#TODO (add basic samplers for number of each object shape and their colours)
-
-def add_objects(arena: composer.Arena, objects: List[str], max_objects: int) -> List[composer.Entity]:
-    """Add objects to the arena."""
-    extra_sensors = []
-    props = []
-    
-    # randomly sample num_objects of each object type
-    num_objects = np.random.randint(1, max_objects, size=len(objects))
-    
-    for object_type, amount in zip(objects, num_objects):
-        for i in range(amount):
-            obj = _add_object(arena, object_type, sample=True)
-            props.append(obj)
-            extra_sensors.append(prop_pose_sensor.PropPoseSensor(obj, name=f'{object_type}_{i}'))
-
-    return props, extra_sensors 
-
-
 if __name__=="__main__":
     
-    key = jax.random.PRNGKey(0)
-    keys = jax.random.split(key, 3)
-
     ## Build base scene ##
+    
+    # TODO: read from config file
     MAX_OBJECTS = 3
 
     # build the base arena
@@ -251,6 +104,7 @@ if __name__=="__main__":
     # add objects to the arena
     props, extra_sensors = add_objects(arena, ['block', 'cylinder', 'sphere'], MAX_OBJECTS)
 
+    # build the physics
     physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)
     
     ## Robot hardware ##
@@ -339,6 +193,8 @@ if __name__=="__main__":
     initializers.append(initialize_arm)
 
     # prop initializer
+
+    # TODO: read workspace params from config
     for prop in props:
         prop_pose_dist = pose_distribution.UniformPoseDistribution(
                 min_pose_bounds=np.array([0.3, -0.35, 0.05, 0.0, 0.0, -np.pi]),
