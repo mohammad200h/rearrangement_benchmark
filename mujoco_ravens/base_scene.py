@@ -1,7 +1,7 @@
 """ Build a MuJoCo scene for robot manipulation tasks. """
 
 import enum
-from typing import Dict, Sequence, Tuple, Union
+from typing import Dict, Sequence, Tuple, Union, List
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -87,10 +87,6 @@ class Colours:
         """Sample a random colour."""
         return self.colour_map[random.choice(self.colour_names)]
 
-colours = Colours()
-MIN_OBJECT_SIZE = 0.02
-MAX_OBJECT_SIZE = 0.15
-
 def render_scene(physics: mjcf.Physics) -> np.ndarray:
   camera = mujoco.MovableCamera(physics, height=480, width=480)
   camera.set_pose([0.0, 0, 0.0], 2.5, 180, -30)
@@ -121,6 +117,10 @@ def add_robot_and_gripper(arena: composer.Arena) -> Tuple[composer.Entity, compo
     arena.attach(arm)
     
     return arm, gripper
+
+colours = Colours()
+MIN_OBJECT_SIZE = 0.02
+MAX_OBJECT_SIZE = 0.05
 
 def _add_block(
         arena: composer.Arena,
@@ -203,7 +203,35 @@ def _add_sphere(
     sphere.set_freejoint(frame.freejoint)
     return sphere
 
+def _add_object(area: composer.Arena, name: str, sample: bool = False) -> composer.Entity:
+    """Add an object to the arena based on object_type."""
+
+    if name == 'block':
+        return _add_block(area, sample=sample)
+    elif name == 'cylinder':
+        return _add_cylinder(area, sample=sample)
+    elif name == 'sphere':
+        return _add_sphere(area, sample=sample)
+    else:
+        raise ValueError(f'Unknown object type {name}')
+
 #TODO (add basic samplers for number of each object shape and their colours)
+
+def add_objects(arena: composer.Arena, objects: List[str], max_objects: int) -> List[composer.Entity]:
+    """Add objects to the arena."""
+    extra_sensors = []
+    props = []
+    
+    # randomly sample num_objects of each object type
+    num_objects = np.random.randint(1, max_objects, size=len(objects))
+    
+    for object_type, amount in zip(objects, num_objects):
+        for i in range(amount):
+            obj = _add_object(arena, object_type, sample=True)
+            props.append(obj)
+            extra_sensors.append(prop_pose_sensor.PropPoseSensor(obj, name=f'{object_type}_{i}'))
+
+    return props, extra_sensors 
 
 
 if __name__=="__main__":
@@ -212,10 +240,7 @@ if __name__=="__main__":
     keys = jax.random.split(key, 3)
 
     ## Build base scene ##
-    NUM_BLOCKS = random.randint(0, 3)
-    NUM_CYLINDERS = random.randint(0, 3)
-    NUM_SPHERES = random.randint(0, 3)
-
+    MAX_OBJECTS = 3
 
     # build the base arena
     arena = build_arena("test")
@@ -224,16 +249,7 @@ if __name__=="__main__":
     arm, gripper = add_robot_and_gripper(arena)
 
     # add objects to the arena
-    extra_sensors = []
-    for i in range(NUM_BLOCKS):
-        block = _add_block(arena, sample=True)
-        extra_sensors.append(prop_pose_sensor.PropPoseSensor(block, name=f'block_{i}'))
-    for i in range(NUM_CYLINDERS):
-        cylinder = _add_cylinder(arena, sample=True)
-        extra_sensors.append(prop_pose_sensor.PropPoseSensor(cylinder, name=f'cylinder_{i}'))
-    for i in range(NUM_SPHERES):
-        sphere = _add_sphere(arena, sample=True)
-        extra_sensors.append(prop_pose_sensor.PropPoseSensor(sphere, name=f'sphere_{i}'))
+    props, extra_sensors = add_objects(arena, ['block', 'cylinder', 'sphere'], MAX_OBJECTS)
 
     physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)
     
@@ -286,7 +302,7 @@ if __name__=="__main__":
             task_name="test",
             arena=arena,
             robots=[fer_and_gripper],
-            props=[block],
+            props=props,
             extra_sensors=extra_sensors,
             extra_effectors=[],
             control_timestep=0.1,
@@ -308,6 +324,7 @@ if __name__=="__main__":
             [joint_action_space, gripper_action_space]
             )
 
+    initializers = []
     # robot intializer
     gripper_pose_dist = pose_distribution.UniformPoseDistribution(
             min_pose_bounds=np.array([0.5, -0.1, 0.1,
@@ -315,26 +332,25 @@ if __name__=="__main__":
             max_pose_bounds=np.array([0.7, 0.1, 0.2,
                               1.25 * np.pi, 0.25 * np.pi, 0.5 * np.pi])
     )
-    print(gripper_pose_dist.sample_pose(np.random.RandomState()))
     initialize_arm = entity_initializer.PoseInitializer(
             initializer_fn = fer_and_gripper.position_gripper,
             pose_sampler = gripper_pose_dist.sample_pose,
             )
+    initializers.append(initialize_arm)
 
-    # block initializer
-    block_pose_dist = pose_distribution.UniformPoseDistribution(
-        min_pose_bounds=np.array([0.5, -0.1, 0.05, 0.0, 0.0, -np.pi]),
-        max_pose_bounds=np.array([0.7, 0.1, 0.05, 0.0, 0.0, np.pi]))
-    initialize_block = entity_initializer.PoseInitializer(
-        initializer_fn = block.set_pose, 
-        pose_sampler = block_pose_dist.sample_pose
-        )
+    # prop initializer
+    for prop in props:
+        prop_pose_dist = pose_distribution.UniformPoseDistribution(
+                min_pose_bounds=np.array([0.3, -0.35, 0.05, 0.0, 0.0, -np.pi]),
+                max_pose_bounds=np.array([0.9, 0.35, 0.05, 0.0, 0.0, np.pi]))
+        initialize_prop = entity_initializer.PoseInitializer(
+                initializer_fn = prop.set_pose, 
+                pose_sampler = prop_pose_dist.sample_pose
+                )
+        initializers.append(initialize_prop)
     
     # task initializer
-    entities_initializer = entity_initializer.TaskEntitiesInitializer([
-        initialize_arm,
-        initialize_block,
-    ])
+    entities_initializer = entity_initializer.TaskEntitiesInitializer(initializers)
 
 
     # Run the initializer and see what the scene looks like.
