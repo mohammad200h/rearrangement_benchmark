@@ -27,7 +27,7 @@ def setup_robot_manipulator(cfg, scene_components):
     arm_sensor = robot_arm_sensor.RobotArmSensor(
         arm,
         name="franka_emika_panda",
-        have_torque_sensors=True,
+        have_torque_sensors=False,
     )
 
     gripper_sensor = robotiq_gripper_sensor.RobotiqGripperSensor(

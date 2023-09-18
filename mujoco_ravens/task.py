@@ -1,7 +1,7 @@
 """A script to setup RAVENS tasks."""
 
 # config
-import hydra
+from hydra import compose, initialize
 from omegaconf import DictConfig
 
 from base_scene import construct_base_scene
@@ -18,9 +18,11 @@ from dm_robotics.agentflow.preprocessors import observation_transforms
 
 import numpy as np
 
+initialize(version_base=None, config_path="./config", job_name="default_config")
+DEFAULT_CONFIG = compose(config_name="scene")
 
-@hydra.main(version_base=None, config_path="./config", config_name="scene")
-def construct_task_env(cfg: DictConfig):
+
+def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
     """Construct a RAVENS task environment."""
     # construct base scene
     scene_components = construct_base_scene(cfg)
@@ -49,6 +51,7 @@ def construct_task_env(cfg: DictConfig):
     joint_action_space = action_spaces.ArmJointActionSpace(
         af.prefix_slicer(parent_action_spec, robot.arm_effector.prefix)
     )
+
     gripper_action_space = action_spaces.GripperActionSpace(
         af.prefix_slicer(parent_action_spec, robot.gripper_effector.prefix)
     )
@@ -99,11 +102,7 @@ def construct_task_env(cfg: DictConfig):
 
     preprocessors.append(
         observation_transforms.RetainObservations(
-            [
-                "franka_emika_panda_joint_position",
-                "franka_emika_panda_joint_velocity",
-                "robotiq_2f85_tcp",
-            ],
+            sensors,
             raise_on_missing=True,
         )
     )
@@ -113,6 +112,7 @@ def construct_task_env(cfg: DictConfig):
 
     env_builder = subtask_env_builder.SubtaskEnvBuilder()
     env_builder.set_task(task)
+    # env.set_reset_option()
     env_builder.set_action_space(combined_action_space)
     for preprocessor in preprocessors:
         env_builder.add_preprocessor(preprocessor)
@@ -122,4 +122,6 @@ def construct_task_env(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    construct_task_env()
+    task_env = construct_task_env()
+    task_env.reset()
+    task_env.close()

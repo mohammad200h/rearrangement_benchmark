@@ -20,7 +20,7 @@ from dm_control import composer, mjcf
 
 # custom props
 from props import add_objects
-from visualization import render_scene
+from cameras import add_camera, render_scene
 
 # config
 import hydra
@@ -67,6 +67,19 @@ def construct_base_scene(cfg: DictConfig) -> None:
     # add props to the arena
     props, extra_sensors = add_objects(arena, ["block", "cylinder", "sphere"], MAX_OBJECTS)
 
+    # add a camera to the arena
+    camera, camera_sensor = add_camera(
+        arena,
+        "overhead_camera",
+        pos=(0.25, 0.0, 1.75),
+        quat=(0.0, 0.0, 0.0, 1.0),
+        height=480,
+        width=480,
+        fovy=90,
+    )
+
+    extra_sensors += camera_sensor
+
     # build the physics
     physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)
 
@@ -89,6 +102,11 @@ def construct_base_scene(cfg: DictConfig) -> None:
     # visualize the scene
     if cfg.visualize_base_scene:
         render_scene(physics)
+
+    # import PIL
+    # image_array = camera.render_rgb(physics)
+    # image = PIL.Image.fromarray(image_array)
+    # image.show()
 
     return {
         "arena": arena,
