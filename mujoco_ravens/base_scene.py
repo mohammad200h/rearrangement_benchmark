@@ -58,6 +58,10 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
+import hydra
+from omegaconf import DictConfig
+
+
 def build_arena(name: str) -> composer.Arena:
     """Build a MuJoCo arena."""
     arena = empty.Arena(name=name)
@@ -70,12 +74,8 @@ def build_arena(name: str) -> composer.Arena:
     arena.mjcf_model.visual.map.znear = 0.0005
     return arena
 
-def add_robot_and_gripper(arena: composer.Arena) -> Tuple[composer.Entity, composer.Entity]:
+def add_robot_and_gripper(arena: composer.Arena, arm, gripper) -> Tuple[composer.Entity, composer.Entity]:
     """Add a robot and gripper to the arena."""""
-    # load the robot and gripper
-    arm = franka_emika.FER()
-    gripper = robotiq_2f85.Robotiq2F85() 
-
     # attach the gripper to the robot
     robot.standard_compose(arm=arm, gripper=gripper)
 
@@ -84,113 +84,27 @@ def add_robot_and_gripper(arena: composer.Arena) -> Tuple[composer.Entity, compo
     
     return arm, gripper
 
-if __name__=="__main__":
-    
-    ## Build base scene ##
-    
-    # TODO: read from config file
-    MAX_OBJECTS = 3
+@hydra.main(version_base=None, config_path="./config", config_name="scene")
+def construct_base_scene(cfg: DictConfig) -> None:
+    """Build a base scene for robot manipulation tasks."""
+    MAX_OBJECTS = cfg.props.max_objects
 
     # build the base arena
     arena = build_arena("test")
+    
+    # add robot arm and gripper to the arena
+    arm = franka_emika.FER()
+    gripper = robotiq_2f85.Robotiq2F85()
+    arm, gripper = add_robot_and_gripper(arena, arm, gripper)
 
-    # add the robot and gripper to the arena
-    arm, gripper = add_robot_and_gripper(arena)
-
-    # add objects to the arena
+    # add props to the arena
     props, extra_sensors = add_objects(arena, ['block', 'cylinder', 'sphere'], MAX_OBJECTS)
 
     # build the physics
     physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)
     
-    ## Robot hardware ##
-
-    # interface for robot control
-    arm_hardware_interface = arm_effector.ArmEffector(
-            arm,
-            action_range_override=None,
-            robot_name = "franka_emika_panda",
-            )
-    gripper_hardware_interface = default_gripper_effector.DefaultGripperEffector(
-            gripper,
-            robot_name = "robotiq_2f85",
-            )
-
-    # robot sensors
-    arm_sensor = robot_arm_sensor.RobotArmSensor(
-                arm,
-                name="franka_emika_panda",
-                have_torque_sensors=True,
-                )
-    gripper_sensor = robotiq_gripper_sensor.RobotiqGripperSensor(
-            gripper,
-            name="robotiq_2f85",
-            )
-    gripper_tcp_sensor = robot_tcp_sensor.RobotTCPSensor(gripper, name="robotiq_2f85")
-    
-
-    ## Task Definition ##
-
-    # try set up task logic
-    robot_sensors = [
-            arm_sensor,
-            gripper_tcp_sensor,
-            gripper_sensor,
-    ]
-
-    fer_and_gripper = robot.StandardRobot(
-            arm=arm,
-            arm_base_site_name="panda_link0",
-            gripper=gripper,
-            robot_sensors=robot_sensors,
-            arm_effector=arm_hardware_interface,
-            gripper_effector=gripper_hardware_interface,
-            )
-
-
-    task = base_task.BaseTask(
-            task_name="test",
-            arena=arena,
-            robots=[fer_and_gripper],
-            props=props,
-            extra_sensors=extra_sensors,
-            extra_effectors=[],
-            control_timestep=0.1,
-            scene_initializer=lambda _: None,
-            episode_initializer=lambda _: None,
-            )
-    
-    # get action spec
-    parent_action_spec = task.effectors_action_spec(physics)
-    
-    # define action spaces
-    joint_action_space = action_spaces.ArmJointActionSpace(
-            af.prefix_slicer(parent_action_spec, arm_hardware_interface.prefix)
-            )
-    gripper_action_space = action_spaces.GripperActionSpace(
-            af.prefix_slicer(parent_action_spec, gripper_hardware_interface.prefix)
-            )
-    combined_action_space = af.CompositeActionSpace(
-            [joint_action_space, gripper_action_space]
-            )
-
+    # add basic prop initializer so they are visible in the scene
     initializers = []
-    # robot intializer
-    gripper_pose_dist = pose_distribution.UniformPoseDistribution(
-            min_pose_bounds=np.array([0.5, -0.1, 0.1,
-                              0.75 * np.pi, -0.25 * np.pi, -0.5 * np.pi]),
-            max_pose_bounds=np.array([0.7, 0.1, 0.2,
-                              1.25 * np.pi, 0.25 * np.pi, 0.5 * np.pi])
-    )
-    initialize_arm = entity_initializer.PoseInitializer(
-            initializer_fn = fer_and_gripper.position_gripper,
-            pose_sampler = gripper_pose_dist.sample_pose,
-            )
-    initializers.append(initialize_arm)
-
-    # prop initializer
-
-    # TODO: read workspace params from config
     for prop in props:
         prop_pose_dist = pose_distribution.UniformPoseDistribution(
                 min_pose_bounds=np.array([0.3, -0.35, 0.05, 0.0, 0.0, -np.pi]),
@@ -201,18 +115,142 @@ if __name__=="__main__":
                 )
         initializers.append(initialize_prop)
     
-    # task initializer
     entities_initializer = entity_initializer.TaskEntitiesInitializer(initializers)
-
-
-    # Run the initializer and see what the scene looks like.
-    before = render_scene(physics)
     entities_initializer(physics, np.random.RandomState())
-    physics.step()  # propogate the changes from the initializer.
-    after = render_scene(physics)
+    physics.step()
+
+    # visualize the scene
+    render_scene(physics)
+
+if __name__=="__main__":
+
+    construct_base_scene()
     
-    before = PIL.Image.fromarray(before)
-    after = PIL.Image.fromarray(after)
-    before.show()
-    after.show()
+    ## TODO: read from config file
+    #MAX_OBJECTS = 3
+
+    ## build the base arena
+    #arena = build_arena("test")
+
+    ## add the robot and gripper to the arena
+    #arm, gripper = add_robot_and_gripper(arena)
+
+    ## add objects to the arena
+    #props, extra_sensors = add_objects(arena, ['block', 'cylinder', 'sphere'], MAX_OBJECTS)
+
+    ## build the physics
+    #physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)
+    #
+    ### Robot hardware ##
+
+    ## interface for robot control
+    #arm_hardware_interface = arm_effector.ArmEffector(
+    #        arm,
+    #        action_range_override=None,
+    #        robot_name = "franka_emika_panda",
+    #        )
+    #gripper_hardware_interface = default_gripper_effector.DefaultGripperEffector(
+    #        gripper,
+    #        robot_name = "robotiq_2f85",
+    #        )
+
+    ## robot sensors
+    #arm_sensor = robot_arm_sensor.RobotArmSensor(
+    #            arm,
+    #            name="franka_emika_panda",
+    #            have_torque_sensors=True,
+    #            )
+    #gripper_sensor = robotiq_gripper_sensor.RobotiqGripperSensor(
+    #        gripper,
+    #        name="robotiq_2f85",
+    #        )
+    #gripper_tcp_sensor = robot_tcp_sensor.RobotTCPSensor(gripper, name="robotiq_2f85")
+    #
+
+    ### Task Definition ##
+
+    ## try set up task logic
+    #robot_sensors = [
+    #        arm_sensor,
+    #        gripper_tcp_sensor,
+    #        gripper_sensor,
+    #]
+
+    #fer_and_gripper = robot.StandardRobot(
+    #        arm=arm,
+    #        arm_base_site_name="panda_link0",
+    #        gripper=gripper,
+    #        robot_sensors=robot_sensors,
+    #        arm_effector=arm_hardware_interface,
+    #        gripper_effector=gripper_hardware_interface,
+    #        )
+
+
+    #task = base_task.BaseTask(
+    #        task_name="test",
+    #        arena=arena,
+    #        robots=[fer_and_gripper],
+    #        props=props,
+    #        extra_sensors=extra_sensors,
+    #        extra_effectors=[],
+    #        control_timestep=0.1,
+    #        scene_initializer=lambda _: None,
+    #        episode_initializer=lambda _: None,
+    #        )
+    #
+    ## get action spec
+    #parent_action_spec = task.effectors_action_spec(physics)
+    #
+    ## define action spaces
+    #joint_action_space = action_spaces.ArmJointActionSpace(
+    #        af.prefix_slicer(parent_action_spec, arm_hardware_interface.prefix)
+    #        )
+    #gripper_action_space = action_spaces.GripperActionSpace(
+    #        af.prefix_slicer(parent_action_spec, gripper_hardware_interface.prefix)
+    #        )
+    #combined_action_space = af.CompositeActionSpace(
+    #        [joint_action_space, gripper_action_space]
+    #        )
+
+    #initializers = []
+    ## robot intializer
+    #gripper_pose_dist = pose_distribution.UniformPoseDistribution(
+    #        min_pose_bounds=np.array([0.5, -0.1, 0.1,
+    #                          0.75 * np.pi, -0.25 * np.pi, -0.5 * np.pi]),
+    #        max_pose_bounds=np.array([0.7, 0.1, 0.2,
+    #                          1.25 * np.pi, 0.25 * np.pi, 0.5 * np.pi])
+    #)
+    #initialize_arm = entity_initializer.PoseInitializer(
+    #        initializer_fn = fer_and_gripper.position_gripper,
+    #        pose_sampler = gripper_pose_dist.sample_pose,
+    #        )
+    #initializers.append(initialize_arm)
+
+    ## prop initializer
+
+    ## TODO: read workspace params from config
+    #for prop in props:
+    #    prop_pose_dist = pose_distribution.UniformPoseDistribution(
+    #            min_pose_bounds=np.array([0.3, -0.35, 0.05, 0.0, 0.0, -np.pi]),
+    #            max_pose_bounds=np.array([0.9, 0.35, 0.05, 0.0, 0.0, np.pi]))
+    #    initialize_prop = entity_initializer.PoseInitializer(
+    #            initializer_fn = prop.set_pose, 
+    #            pose_sampler = prop_pose_dist.sample_pose
+    #            )
+    #    initializers.append(initialize_prop)
+    #
+    ## task initializer
+    #entities_initializer = entity_initializer.TaskEntitiesInitializer(initializers)
+
+
+    ## Run the initializer and see what the scene looks like.
+    #before = render_scene(physics)
+    #entities_initializer(physics, np.random.RandomState())
+    #physics.step()  # propogate the changes from the initializer.
+    #after = render_scene(physics)
+    #
+    #before = PIL.Image.fromarray(before)
+    #after = PIL.Image.fromarray(after)
+    #before.show()
+    #after.show()
 
