@@ -15,15 +15,20 @@ from dm_robotics.moma import robot
 
 
 def setup_robot_manipulator(cfg, scene_components): 
+    """Set up robot manipulator"""
+    # read robot and gripper from scene
+    arm = scene_components["arm"]
+    gripper = scene_components["gripper"]
+
     # set up robot control interfaces
     arm_hardware_interface = arm_effector.ArmEffector(
-            scene_components["arm"],
+            arm,
             action_range_override=None,
             robot_name = "franka_emika_panda",
             )
 
     gripper_hardware_interface = default_gripper_effector.DefaultGripperEffector(
-            scene_components["gripper"],
+            gripper,
             robot_name = "robotiq_2f85",
             ) 
 
