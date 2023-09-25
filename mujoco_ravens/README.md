@@ -7,6 +7,6 @@
     ├── base_scene.py           # definition of base scene (arena, robots, props)
     ├── cameras.py              # utilities for rendering scene
     ├── props.py                # prop creation and addition to scene
+    ├── rearrangement_task.py   # high-level API for rearrangement tasks
     ├── robot.py                # robot creation and addition to scene
     ├── task.py                 # task logic and creation (MoMa)
-    ├── rearrangement_task.py   # high-level API for rearrangement tasks
