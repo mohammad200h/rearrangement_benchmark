@@ -1,7 +1,6 @@
 """Build a MuJoCo scene for robot manipulation tasks."""
 
 from typing import Tuple
-import numpy as np
 
 # arena models
 from dm_robotics.moma.models.arenas import empty
@@ -11,16 +10,12 @@ from models.arms import franka_emika
 from dm_robotics.moma.models.end_effectors.robot_hands import robotiq_2f85
 from dm_robotics.moma import robot
 
-# initializers
-from dm_robotics.geometry import pose_distribution
-from dm_robotics.moma import entity_initializer
-
 # physics
 from dm_control import composer, mjcf
 
 # custom props
-from props import add_objects
-from cameras import add_camera, render_scene
+from props import add_objects, Block
+from cameras import add_camera
 
 # config
 import hydra
@@ -34,10 +29,32 @@ def build_arena(name: str) -> composer.Arena:
     arena.mjcf_model.option.gravity = (0.0, 0.0, -1.0)
     arena.mjcf_model.size.nconmax = 1000
     arena.mjcf_model.size.njmax = 2000
-    arena.mjcf_model.visual.__getattr__("global").offheight = 480
+    arena.mjcf_model.visual.__getattr__("global").offheight = 640
     arena.mjcf_model.visual.__getattr__("global").offwidth = 640
     arena.mjcf_model.visual.map.znear = 0.0005
     return arena
+
+
+def add_basic_table(arena: composer.Arena) -> Block:
+    """Add a basic table to the arena."""
+    table = Block(
+        name="table",
+        x_len=0.6,
+        y_len=0.8,
+        z_len=0.4,
+        rgba=(0.5, 0.5, 0.5, 1.0),
+    )
+
+    # define attachment site
+    attach_site = arena.mjcf_model.worldbody.add(
+        "site",
+        name="table_center",
+        pos=(0.4, 0.0, 0.0),
+    )
+
+    arena.attach(table, attach_site)
+
+    return table
 
 
 def add_robot_and_gripper(arena: composer.Arena, arm, gripper) -> Tuple[composer.Entity, composer.Entity]:
@@ -45,8 +62,15 @@ def add_robot_and_gripper(arena: composer.Arena, arm, gripper) -> Tuple[composer
     # attach the gripper to the robot
     robot.standard_compose(arm=arm, gripper=gripper)
 
+    # define robot base site
+    robot_base_site = arena.mjcf_model.worldbody.add(
+        "site",
+        name="robot_base",
+        pos=(0.0, 0.0, 0.4),
+    )
+
     # add the robot and gripper to the arena
-    arena.attach(arm)
+    arena.attach(arm, robot_base_site)
 
     return arm, gripper
 
@@ -59,6 +83,9 @@ def construct_base_scene(cfg: DictConfig) -> None:
     # build the base arena
     arena = build_arena("test")
 
+    # add a basic table to the arena
+    add_basic_table(arena)
+
     # add robot arm and gripper to the arena
     arm = franka_emika.FER()
     gripper = robotiq_2f85.Robotiq2F85()
@@ -67,46 +94,33 @@ def construct_base_scene(cfg: DictConfig) -> None:
     # add props to the arena
     props, extra_sensors = add_objects(arena, ["block", "cylinder", "sphere"], MAX_OBJECTS)
 
-    # add a camera to the arena
-    camera, camera_sensor = add_camera(
+    # add overhead camera to the arena
+    overhead_camera, overhead_camera_sensor = add_camera(
         arena,
         "overhead_camera",
-        pos=(0.25, 0.0, 1.75),
-        quat=(0.0, 0.0, 0.0, 1.0),
-        height=480,
-        width=480,
-        fovy=90,
+        pos=(0.4, 0.0, 2.0),
+        quat=(0.7068252, 0, 0, 0.7073883),
+        height=640,
+        width=640,
+        fovy=120,
     )
 
-    extra_sensors += camera_sensor
+    extra_sensors += overhead_camera_sensor
+
+    front_camera, front_camera_sensor = add_camera(
+        arena,
+        "front_camera",
+        pos=(2.5, 0.0, 1.4),
+        quat=(0.6133964, 0.3514872, 0.3512074, 0.6138851),
+        height=640,
+        width=640,
+        fovy=120,
+    )
+
+    extra_sensors += front_camera_sensor
 
     # build the physics
     physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)
-
-    # add basic prop initializer so they are visible in the scene
-    initializers = []
-    for prop in props:
-        prop_pose_dist = pose_distribution.UniformPoseDistribution(
-            min_pose_bounds=np.array([0.3, -0.35, 0.05, 0.0, 0.0, -np.pi]),
-            max_pose_bounds=np.array([0.9, 0.35, 0.05, 0.0, 0.0, np.pi]),
-        )
-        initialize_prop = entity_initializer.PoseInitializer(
-            initializer_fn=prop.set_pose, pose_sampler=prop_pose_dist.sample_pose
-        )
-        initializers.append(initialize_prop)
-
-    entities_initializer = entity_initializer.TaskEntitiesInitializer(initializers)
-    entities_initializer(physics, np.random.RandomState())
-    physics.step()
-
-    # visualize the scene
-    if cfg.visualize_base_scene:
-        render_scene(physics)
-
-    # import PIL
-    # image_array = camera.render_rgb(physics)
-    # image = PIL.Image.fromarray(image_array)
-    # image.show()
 
     return {
         "arena": arena,

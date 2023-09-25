@@ -5,6 +5,9 @@ from dm_robotics.moma.sensors import robot_arm_sensor, robotiq_gripper_sensor, r
 from dm_robotics.moma import robot
 
 
+# TODO: overwrite actuators
+
+
 def setup_robot_manipulator(cfg, scene_components):
     """Set up robot manipulator."""
     # read robot and gripper from scene

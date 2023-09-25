@@ -7,9 +7,10 @@ from omegaconf import DictConfig
 from base_scene import construct_base_scene
 from robot import setup_robot_manipulator
 
-from dm_robotics.moma import base_task
 from dm_robotics.moma import action_spaces
+from dm_robotics.moma import base_task
 from dm_robotics.moma import entity_initializer
+from dm_robotics.moma import moma_option
 from dm_robotics.geometry import pose_distribution
 from dm_robotics.moma import subtask_env_builder
 from dm_robotics import agentflow as af
@@ -63,8 +64,8 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
 
     # initialize robot based on position of end effector
     gripper_pose_dist = pose_distribution.UniformPoseDistribution(
-        min_pose_bounds=np.array([0.5, -0.1, 0.1, 0.75 * np.pi, -0.25 * np.pi, -0.5 * np.pi]),
-        max_pose_bounds=np.array([0.7, 0.1, 0.2, 1.25 * np.pi, 0.25 * np.pi, 0.5 * np.pi]),
+        min_pose_bounds=np.array([0.25, -0.1, 0.5, 0.95 * np.pi, -0.15 * np.pi, -0.5 * np.pi]),
+        max_pose_bounds=np.array([0.25, 0.1, 0.6, 1.05 * np.pi, 0.15 * np.pi, 0.5 * np.pi]),
     )
     initialize_arm = entity_initializer.PoseInitializer(
         initializer_fn=robot.position_gripper,
@@ -75,8 +76,8 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
     # prop initializers
     for prop in scene_components["props"]:
         prop_pose_dist = pose_distribution.UniformPoseDistribution(
-            min_pose_bounds=np.array([0.3, -0.35, 0.05, 0.0, 0.0, -np.pi]),
-            max_pose_bounds=np.array([0.9, 0.35, 0.05, 0.0, 0.0, np.pi]),
+            min_pose_bounds=np.array([0.4, -0.2, 0.45, 0.0, 0.0, -np.pi]),
+            max_pose_bounds=np.array([0.8, 0.2, 0.45, 0.0, 0.0, np.pi]),
         )
         initialize_prop = entity_initializer.PoseInitializer(
             initializer_fn=prop.set_pose, pose_sampler=prop_pose_dist.sample_pose
@@ -112,16 +113,46 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
 
     env_builder = subtask_env_builder.SubtaskEnvBuilder()
     env_builder.set_task(task)
-    # env.set_reset_option()
     env_builder.set_action_space(combined_action_space)
     for preprocessor in preprocessors:
         env_builder.add_preprocessor(preprocessor)
+
+    # for the reset option we need to ensure values are within ranges of robot joints
+    base_env = env_builder.build_base_env()
+    parent_action_spec = task.effectors_action_spec(physics=base_env.physics, effectors=task.effectors)
+
+    # define a dummy action:
+    # https://github.com/google-deepmind/dm_robotics/blob/e4631a91363b3f7b05bc848e818ad6485292f110/py/agentflow/options/basic_options.py#L103
+    # TODO: fix this logic based on selected control interface (e.g. position, velocity, torque)
+    # currently choosing zeros results in a validation error
+    min_action = parent_action_spec.minimum
+    noop_action = np.ones(parent_action_spec.shape, dtype=parent_action_spec.dtype) * min_action
+    # noop_action = af.spec_utils.zeros(parent_action_spec)
+    delegate = af.FixedOp(noop_action, name="NoOp")
+    reset_option = moma_option.MomaOption(
+        physics_getter=lambda: base_env.physics,
+        effectors=task.effectors,
+        delegate=delegate,
+    )
+    env_builder.set_reset_option(reset_option)
+
     task_environment = env_builder.build()
 
     return task_environment
 
 
 if __name__ == "__main__":
+    import PIL
+
     task_env = construct_task_env()
-    task_env.reset()
+    obs = task_env.reset()
+    front_camera = obs[3]["front_camera_rgb_img"].astype(np.uint8)
+    PIL.Image.fromarray(front_camera).show()
+    overhead_camera = obs[3]["overhead_camera_rgb_img"].astype(np.uint8)
+    PIL.Image.fromarray(overhead_camera).show()
+    obs = task_env.reset()
+    front_camera = obs[3]["front_camera_rgb_img"].astype(np.uint8)
+    PIL.Image.fromarray(front_camera).show()
+    overhead_camera = obs[3]["overhead_camera_rgb_img"].astype(np.uint8)
+    PIL.Image.fromarray(overhead_camera).show()
     task_env.close()
