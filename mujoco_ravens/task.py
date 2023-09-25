@@ -144,12 +144,8 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
 if __name__ == "__main__":
     import PIL
 
+    # test the environment
     task_env = construct_task_env()
-    obs = task_env.reset()
-    front_camera = obs[3]["front_camera_rgb_img"].astype(np.uint8)
-    PIL.Image.fromarray(front_camera).show()
-    overhead_camera = obs[3]["overhead_camera_rgb_img"].astype(np.uint8)
-    PIL.Image.fromarray(overhead_camera).show()
     obs = task_env.reset()
     front_camera = obs[3]["front_camera_rgb_img"].astype(np.uint8)
     PIL.Image.fromarray(front_camera).show()
