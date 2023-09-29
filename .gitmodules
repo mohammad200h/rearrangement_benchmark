@@ -1,15 +1,27 @@
 [submodule "mujoco_ravens/mujoco_menagerie"]
 	path = mujoco_ravens/mujoco_menagerie
 	url = git@github.com:peterdavidfagan/mujoco_menagerie.git
-[submodule "mujoco_ravens/ros2_ws/src/topic_based_ros2_control"]
-	path = mujoco_ravens/ros2_ws/src/topic_based_ros2_control
-	url = git@github.com:peterdavidfagan/topic_based_ros2_control.git
-[submodule "mujoco_ravens/ros2_ws/src/ros2_control"]
-	path = mujoco_ravens/ros2_ws/src/ros2_control
+[submodule "mujoco_ravens/ros2_ws/src/control/ros2_control"]
+	path = mujoco_ravens/ros2_ws/src/control/ros2_control
 	url = git@github.com:peterdavidfagan/ros2_control.git
-[submodule "mujoco_ravens/ros2_ws/src/ros2_controllers"]
-	path = mujoco_ravens/ros2_ws/src/ros2_controllers
+[submodule "mujoco_ravens/ros2_ws/src/control/ros2_controllers"]
+	path = mujoco_ravens/ros2_ws/src/control/ros2_controllers
 	url = git@github.com:peterdavidfagan/ros2_controllers.git
-[submodule "mujoco_ravens/ros2_ws/src/moveit2"]
-	path = mujoco_ravens/ros2_ws/src/moveit2
+[submodule "mujoco_ravens/ros2_ws/src/control/topic_based_ros2_control"]
+	path = mujoco_ravens/ros2_ws/src/control/topic_based_ros2_control
+	url = git@github.com:peterdavidfagan/topic_based_ros2_control.git
+[submodule "mujoco_ravens/ros2_ws/src/motion_planning/moveit2"]
+	path = mujoco_ravens/ros2_ws/src/motion_planning/moveit2
 	url = git@github.com:peterdavidfagan/moveit2.git
+[submodule "mujoco_ravens/ros2_ws/src/motion_planning/franka_robotiq"]
+	path = mujoco_ravens/ros2_ws/src/motion_planning/franka_robotiq
+	url = git@github.com:peterdavidfagan/franka_robotiq.git
+[submodule "mujoco_ravens/ros2_ws/src/control/ros2_robotiq_gripper"]
+	path = mujoco_ravens/ros2_ws/src/control/ros2_robotiq_gripper
+	url = https://github.com/PickNikRobotics/ros2_robotiq_gripper.git
+[submodule "mujoco_ravens/ros2_ws/src/control/serial"]
+	path = mujoco_ravens/ros2_ws/src/control/serial
+	url = https://github.com/tylerjw/serial.git
+[submodule "mujoco_ravens/ros2_ws/src/control/gripper_action_client"]
+	path = mujoco_ravens/ros2_ws/src/control/gripper_action_client
+	url = git@github.com:peterdavidfagan/gripper_action_client.git
