@@ -13,43 +13,18 @@ class RearrangementTask:
     def __init__(self, config):
         """Initialize the rearrangement task."""
         if config is None:
-            self._task_env = construct_task_env()
+            self._task_env, config = construct_task_env()
         else:
-            self._task_env = construct_task_env(config)
+            self._task_env, _ = construct_task_env(config)
 
-        self.effectors = self._task_env.task.effectors
-        self.FILTER_GEOM_WORDS = ["panda", "table", "ground"]
+        self.config = config
+        self.shapes = self.config.props.shapes
 
         # Automatically reset the task environment on initialization.
         self._task_env.reset()
 
-    def testing_dude(self):
-        """Testing dude."""
-        print("testing dude")
-        print(self._task_env.physics.data.geom_xpos)
-
-    def render(self):
-        """Render the task environment."""
-        pixels = self._task_env.physics.render()
-        PIL.Image.fromarray(pixels).show()
-
-    def print_mjcf(self):
-        """Print the MJCF model."""
-        print(self._task_env.physics.data.time)
-        print(self._task_env.physics.named.data.geom_xpos)
-        print(self._task_env.physics.named.model.geom_rgba)
-        parent_action_spec = self._task_env.task.effectors_action_spec(
-            physics=self._task_env.physics, effectors=self.effectors
-        )
-        min_action = parent_action_spec.minimum
-        noop_action = np.ones(parent_action_spec.shape, dtype=parent_action_spec.dtype) * min_action
-        for _ in range(10):
-            self._task_env.step(noop_action)
-            print(self._task_env.physics.data.time)
-            print(self._task_env.physics.named.data.geom_xpos)
-
-    def close(self):
-        """Close the task environment."""
+    def __del__(self):
+        """Close the task environment on instance deletion."""
         self._task_env.close()
 
     def pick(self, object_id):
@@ -61,41 +36,76 @@ class RearrangementTask:
         """
         raise NotImplementedError
 
+    def place(self, object_id, position, orientation):
+        """
+        Place an object.
+
+        This method leverages MoveIt to plan and execute a place motion.
+        ROS 2 control manages sending commands to hardware interfaces.
+        """
+        raise NotImplementedError
+
     @property
-    def domain_model(self) -> dict:
+    def props(self) -> dict:
         """
         Gets domain model.
 
         The domain model is a dictionary of objects and their properties.
         """
-        # get manipulation object names
-        object_names = [
-            self._task_env.physics.model.id2name(i, "geom") for i in range(self._task_env.physics.model.ngeom)
+        # get prop object names
+        prop_names = [
+            self._task_env.physics.model.id2name(i, "geom")
+            for i in range(self._task_env.physics.model.ngeom)
+            if any(keyword in self._task_env.physics.model.id2name(i, "geom") for keyword in self.shapes)
         ]
-        object_names = [obj for obj in object_names if all(keyword not in obj for keyword in self.FILTER_GEOM_WORDS)]
+        prop_ids = [self._task_env.physics.model.name2id(name, "geom") for name in prop_names]
 
         # get object information
-        object_positions = self._task_env.physics.named.data.geom_xpos[object_names]
-        object_orientations = self._task_env.physics.named.data.geom_xmat[object_names]
-        object_orientations = [mat_to_quat(mat.reshape((3, 3))) for mat in object_orientations]
-        object_rgba = self._task_env.physics.named.model.geom_rgba[object_names]
+        prop_positions = self._task_env.physics.named.data.geom_xpos[prop_names]
+        prop_orientations = self._task_env.physics.named.data.geom_xmat[prop_names]
+        prop_orientations = [mat_to_quat(mat.reshape((3, 3))) for mat in prop_orientations]
+        prop_rgba = self._task_env.physics.named.model.geom_rgba[prop_names]
+        prop_names = [name.split("/")[0] for name in prop_names]
 
-        print(object_positions)
-        print(object_orientations)
-        print(object_rgba)
+        # get object bounding box information
+        def get_bbox(prop_id, segmentation_map):
+            """Get the bounding box of an object (PASCAL VOC)."""
+            prop_coords = np.argwhere(segmentation_map[:, :, 0] == prop_id)
+            bbox_corners = np.array(
+                [
+                    np.min(prop_coords[:, 0]),
+                    np.min(prop_coords[:, 1]),
+                    np.max(prop_coords[:, 0]),
+                    np.max(prop_coords[:, 1]),
+                ]
+            )
 
-        # map object coordinates to se2
+            return bbox_corners
 
-        return dict
+        # TODO: consider vectorizing this
+        segmentation_map = self._task_env.physics.render(segmentation=True)
+        prop_bbox = []
+        for idx in prop_ids:
+            bbox = get_bbox(idx, segmentation_map)
+            prop_bbox.append(bbox)
 
-    @property
-    def problem_instance(self):
-        """
-        Gets problem instance.
+        # create a dictionary with all the data
+        prop_info = {
+            prop_names[i]: {
+                "position": prop_positions[i],
+                "orientation": prop_orientations[i],
+                "rgba": prop_rgba[i],
+                "bbox": prop_bbox[i],
+            }
+            for i in range(len(prop_names))
+        }
 
-        The problem instance is a dictionary of objects and their locations.
-        """
-        raise NotImplementedError
+        return prop_info
+
+    def render(self):
+        """Render the task environment."""
+        pixels = self._task_env.physics.render()
+        PIL.Image.fromarray(pixels).show()
 
 
 if __name__ == "__main__":
@@ -103,5 +113,5 @@ if __name__ == "__main__":
     # task.testing_dude()
     # task.render()
     # task.print_mjcf()
-    task.domain_model
-    task.close()
+    task.render()
+    print(task.props)

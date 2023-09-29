@@ -1,0 +1,27 @@
+- name: front_camera
+  pos: [2.5, 0.0, 1.4]
+  quat: [0.6133964, 0.3514872, 0.3512074, 0.6138851]
+  height: 640
+  width: 640
+  fovy: 120
+
+- name: overhead_camera
+  pos: [0.4, 0.0, 2.0]
+  quat: [0.7068252, 0, 0, 0.7073883]
+  height: 640
+  width: 640
+  fovy: 120
+
+    #- left_camera:
+    #  pos: []
+    #  quat: []
+    #  height: 640
+    #  width: 640
+    #  fov: 120
+    #
+    #- right_camera:
+    #  pos: []
+    #  quat: []
+    #  height: 640
+    #  width: 640
+    #  fov: 120

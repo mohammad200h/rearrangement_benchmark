@@ -1,1 +1,8 @@
-# placeholder
+initializers:
+  workspace:
+    min_pose: [0.45, -0.3, 0.45, 0.0, 0.0, -3.14]
+    max_pose: [0.95, 0.3, 0.45, 0.0, 0.0, 3.14]
+
+  gripper:
+    min_pose: [0.3, -0.1, 0.6, 3.14, 0.0, 0.0]
+    max_pose: [0.4, 0.1, 0.8, 3.14, 0.0, 0.0]

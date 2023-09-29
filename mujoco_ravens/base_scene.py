@@ -5,9 +5,7 @@ from typing import Tuple
 # arena models
 from dm_robotics.moma.models.arenas import empty
 
-# robot models
-from models.arms import franka_emika
-from dm_robotics.moma.models.end_effectors.robot_hands import robotiq_2f85
+# robot
 from dm_robotics.moma import robot
 
 # physics
@@ -19,6 +17,7 @@ from cameras import add_camera
 
 # config
 import hydra
+from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 
@@ -78,53 +77,44 @@ def add_robot_and_gripper(arena: composer.Arena, arm, gripper) -> Tuple[composer
 @hydra.main(version_base=None, config_path="./config", config_name="scene")
 def construct_base_scene(cfg: DictConfig) -> None:
     """Build a base scene for robot manipulation tasks."""
-
     # build the base arena
-    arena = build_arena("test")
+    arena = build_arena("base_scene")
 
     # add a basic table to the arena
     add_basic_table(arena)
 
     # add robot arm and gripper to the arena
-    arm = franka_emika.FER()
-    gripper = robotiq_2f85.Robotiq2F85()
+    arm = instantiate(cfg.robots.arm)
+    gripper = instantiate(cfg.robots.gripper)
+    # arm = franka_emika.FER()
+    # gripper = robotiq_2f85.Robotiq2F85()
     arm, gripper = add_robot_and_gripper(arena, arm, gripper)
 
     # add props to the arena
-    props, extra_sensors = add_objects(arena,
-                                       shapes=cfg.props.shapes,
-                                       colours=cfg.props.colours,
-                                       min_object_size=cfg.props.min_object_size,
-                                       max_object_size=cfg.props.max_object_size,
-                                       min_objects=cfg.props.min_objects,
-                                       max_objects=cfg.props.max_objects,
-                                       sample_size=cfg.props.sample_size,
-                                       sample_colour=cfg.props.sample_colour,)
-
-    # add overhead camera to the arena
-    overhead_camera, overhead_camera_sensor = add_camera(
+    props, extra_sensors = add_objects(
         arena,
-        "overhead_camera",
-        pos=(0.4, 0.0, 2.0),
-        quat=(0.7068252, 0, 0, 0.7073883),
-        height=640,
-        width=640,
-        fovy=120,
+        shapes=cfg.props.shapes,
+        colours=cfg.props.colours,
+        min_object_size=cfg.props.min_object_size,
+        max_object_size=cfg.props.max_object_size,
+        min_objects=cfg.props.min_objects,
+        max_objects=cfg.props.max_objects,
+        sample_size=cfg.props.sample_size,
+        sample_colour=cfg.props.sample_colour,
     )
 
-    extra_sensors += overhead_camera_sensor
-
-    front_camera, front_camera_sensor = add_camera(
-        arena,
-        "front_camera",
-        pos=(2.5, 0.0, 1.4),
-        quat=(0.6133964, 0.3514872, 0.3512074, 0.6138851),
-        height=640,
-        width=640,
-        fovy=120,
-    )
-
-    extra_sensors += front_camera_sensor
+    # add cameras to the arena
+    for camera in cfg.cameras:
+        camera, camera_sensor = add_camera(
+            arena,
+            name=camera.name,
+            pos=camera.pos,
+            quat=camera.quat,
+            height=camera.height,
+            width=camera.width,
+            fovy=camera.fovy,
+        )
+        extra_sensors += camera_sensor
 
     # build the physics
     physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)

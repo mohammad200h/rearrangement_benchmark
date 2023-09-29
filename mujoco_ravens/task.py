@@ -64,8 +64,8 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
 
     # initialize robot based on position of end effector
     gripper_pose_dist = pose_distribution.UniformPoseDistribution(
-        min_pose_bounds=np.array([0.25, -0.1, 0.5, 0.95 * np.pi, -0.15 * np.pi, -0.5 * np.pi]),
-        max_pose_bounds=np.array([0.25, 0.1, 0.6, 1.05 * np.pi, 0.15 * np.pi, 0.5 * np.pi]),
+        min_pose_bounds=np.array(cfg.task.initializers.gripper.min_pose),
+        max_pose_bounds=np.array(cfg.task.initializers.gripper.max_pose),
     )
     initialize_arm = entity_initializer.PoseInitializer(
         initializer_fn=robot.position_gripper,
@@ -76,8 +76,8 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
     # prop initializers
     for prop in scene_components["props"]:
         prop_pose_dist = pose_distribution.UniformPoseDistribution(
-            min_pose_bounds=np.array([0.4, -0.2, 0.45, 0.0, 0.0, -np.pi]),
-            max_pose_bounds=np.array([0.8, 0.2, 0.45, 0.0, 0.0, np.pi]),
+            min_pose_bounds=np.array(cfg.task.initializers.workspace.min_pose),
+            max_pose_bounds=np.array(cfg.task.initializers.workspace.max_pose),
         )
         initialize_prop = entity_initializer.PoseInitializer(
             initializer_fn=prop.set_pose, pose_sampler=prop_pose_dist.sample_pose
@@ -138,7 +138,7 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
 
     task_environment = env_builder.build()
 
-    return task_environment
+    return task_environment, cfg
 
 
 if __name__ == "__main__":

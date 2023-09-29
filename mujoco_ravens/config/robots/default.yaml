@@ -1,1 +1,7 @@
-# placeholder
+arm:
+  _target_: mujoco_ravens.models.arms.franka_emika.FER
+
+gripper:
+  _target_: dm_robotics.moma.models.end_effectors.robot_hands.robotiq_2f85.Robotiq2F85
+
+controller:
