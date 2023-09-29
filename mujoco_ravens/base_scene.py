@@ -14,7 +14,7 @@ from dm_robotics.moma import robot
 from dm_control import composer, mjcf
 
 # custom props
-from props import add_objects, Block
+from props import add_objects, Rectangle
 from cameras import add_camera
 
 # config
@@ -35,9 +35,9 @@ def build_arena(name: str) -> composer.Arena:
     return arena
 
 
-def add_basic_table(arena: composer.Arena) -> Block:
+def add_basic_table(arena: composer.Arena) -> Rectangle:
     """Add a basic table to the arena."""
-    table = Block(
+    table = Rectangle(
         name="table",
         x_len=0.6,
         y_len=0.8,
@@ -78,7 +78,6 @@ def add_robot_and_gripper(arena: composer.Arena, arm, gripper) -> Tuple[composer
 @hydra.main(version_base=None, config_path="./config", config_name="scene")
 def construct_base_scene(cfg: DictConfig) -> None:
     """Build a base scene for robot manipulation tasks."""
-    MAX_OBJECTS = cfg.props.max_objects
 
     # build the base arena
     arena = build_arena("test")
@@ -92,7 +91,15 @@ def construct_base_scene(cfg: DictConfig) -> None:
     arm, gripper = add_robot_and_gripper(arena, arm, gripper)
 
     # add props to the arena
-    props, extra_sensors = add_objects(arena, ["block", "cylinder", "sphere"], MAX_OBJECTS)
+    props, extra_sensors = add_objects(arena,
+                                       shapes=cfg.props.shapes,
+                                       colours=cfg.props.colours,
+                                       min_object_size=cfg.props.min_object_size,
+                                       max_object_size=cfg.props.max_object_size,
+                                       min_objects=cfg.props.min_objects,
+                                       max_objects=cfg.props.max_objects,
+                                       sample_size=cfg.props.sample_size,
+                                       sample_colour=cfg.props.sample_colour,)
 
     # add overhead camera to the arena
     overhead_camera, overhead_camera_sensor = add_camera(
