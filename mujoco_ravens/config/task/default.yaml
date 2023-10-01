@@ -1,3 +1,5 @@
+use_simulation: True # whether we are running a simulated or real experiment
+
 initializers:
   workspace:
     min_pose: [0.45, -0.3, 0.45, 0.0, 0.0, -3.14]

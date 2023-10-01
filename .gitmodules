@@ -22,6 +22,11 @@
 [submodule "mujoco_ravens/ros2_ws/src/control/serial"]
 	path = mujoco_ravens/ros2_ws/src/control/serial
 	url = https://github.com/tylerjw/serial.git
+	branch = ros2
 [submodule "mujoco_ravens/ros2_ws/src/control/gripper_action_client"]
 	path = mujoco_ravens/ros2_ws/src/control/gripper_action_client
 	url = git@github.com:peterdavidfagan/gripper_action_client.git
+[submodule "mujoco_ravens/ros2_ws/src/control/franka_ros2"]
+	path = mujoco_ravens/ros2_ws/src/control/franka_ros2
+	url = git@github.com:peterdavidfagan/franka_ros2.git
+	branch = mujoco_ravens
