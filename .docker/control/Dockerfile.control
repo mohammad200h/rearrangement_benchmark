@@ -18,13 +18,10 @@ RUN apt update && apt upgrade -y && \
     dpkg -i libfranka-*.deb
 
 # set up ROS workspace
-ENV ROS_UNDERLAY /root/panda_ws/install
+ENV ROS_UNDERLAY /root/ros2_ws/install
 WORKDIR $ROS_UNDERLAY/..
-COPY src/demo ./src/demo
-COPY src/control ./src/control
-COPY src/motion_planning/franka_robotiq ./src/motion_planning/franka_robotiq
-COPY src/perception/src/cameras ./src/perception/src/cameras
-
+COPY mujoco_ravens/ros2_ws/src/control ./src/control
+COPY mujoco_ravens/ros2_ws/src/motion_planning/franka_robotiq ./src/motion_planning/franka_robotiq
 
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
     apt-get update && \

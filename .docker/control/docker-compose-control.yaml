@@ -2,7 +2,7 @@ version: "3"
 
 services:
   moveit:
-    image: ghcr.io/ipab-rad/panda_stacking_demo:control
+    image: ghcr.io/peterdavidfagan/mujoco_ravens_control:latest
     build:
       context: ../../
       dockerfile: .docker/control/Dockerfile.control
@@ -16,4 +16,4 @@ services:
       rtprio: 70
       rttime: -1 # corresponds to 'unlimited'
       memlock: 8428281856
-    command: ros2 launch panda_stacking_demo demo_control.launch.py
+    command: echo "mission accomplished"
