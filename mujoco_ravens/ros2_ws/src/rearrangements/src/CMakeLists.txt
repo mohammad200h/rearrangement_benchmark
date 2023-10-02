@@ -5,6 +5,6 @@ install(
 	)
 
 install(
-	DIRECTORY config launch notebooks scripts
+	DIRECTORY config launch scripts
 	DESTINATION share/${PROJECT_NAME}
 )
