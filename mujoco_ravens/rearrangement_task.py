@@ -6,7 +6,10 @@ import numpy as np
 from task import construct_task_env
 
 from dm_robotics.transformations.transformations import mat_to_quat
-from ros2_start_docker import start_control_server
+from ros2_start_docker import (
+    start_control_server,
+    stop_control_server,
+)
 
 
 class RearrangementTask:
@@ -30,7 +33,15 @@ class RearrangementTask:
             raise NotImplementedError
 
         # Automatically reset the task environment on initialization.
+        # self._task_env.reset()
+
+    def __enter__(self):
+        """Reset the task environment on entry of context."""
         self._task_env.reset()
+
+    def __exit__(self, type, value, traceback):
+        """Shutdown docker containers on exit of context."""
+        stop_control_server()
 
     def __del__(self):
         """Close the task environment on instance deletion."""
@@ -119,8 +130,7 @@ class RearrangementTask:
 
 if __name__ == "__main__":
     task = RearrangementTask(None)
-    # task.testing_dude()
-    # task.render()
-    # task.print_mjcf()
-    task.render()
-    print(task.props)
+    # require context manager
+    with task:
+        task.render()
+        print(task.props)
