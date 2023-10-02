@@ -1,6 +1,4 @@
 """A high-level task API for rearrangement tasks that leverage motion planning."""
-import time
-
 import PIL
 import numpy as np
 from task import construct_task_env
@@ -8,8 +6,21 @@ from task import construct_task_env
 from dm_robotics.transformations.transformations import mat_to_quat
 from ros2_start_docker import (
     start_control_server,
-    stop_control_server,
+    shutdown_control_server,
+    start_motion_planning_prerequisites,
+    shutdown_motion_planning_prerequisites,
 )
+
+# ros 2 client library
+import rclpy
+from rclpy.logging import get_logger
+
+# moveit python library
+# from moveit.core.robot_state import RobotState
+# from moveit.planning import (
+#    MoveItPy,
+#    MultiPipelinePlanRequestParameters,
+# )
 
 
 class RearrangementTask:
@@ -17,6 +28,7 @@ class RearrangementTask:
 
     def __init__(self, config):
         """Initialize the rearrangement task."""
+        # set up simulation environment
         if config is None:
             self._task_env, config = construct_task_env()
         else:
@@ -26,14 +38,7 @@ class RearrangementTask:
         self.shapes = self.config.props.shapes
 
         # start control and motion planning software
-        if self.config.task.use_simulation:
-            start_control_server()
-            time.sleep(5)
-        else:
-            raise NotImplementedError
-
-        # Automatically reset the task environment on initialization.
-        # self._task_env.reset()
+        self._start_ros()
 
     def __enter__(self):
         """Reset the task environment on entry of context."""
@@ -41,28 +46,55 @@ class RearrangementTask:
 
     def __exit__(self, type, value, traceback):
         """Shutdown docker containers on exit of context."""
-        stop_control_server()
+        shutdown_control_server()
+        shutdown_motion_planning_prerequisites()
 
     def __del__(self):
         """Close the task environment on instance deletion."""
         self._task_env.close()
 
-    def pick(self, object_id):
+    def _start_ros(self):
+        """Start ROS 2 client library."""
+        rclpy.init()
+        self.logger = get_logger("rearrangement_task")
+        if self.config.task.use_simulation:
+            start_control_server()
+            start_motion_planning_prerequisites()
+        else:
+            raise NotImplementedError
+
+    def transporter_pick(self, pixel_coords):
         """
         Pick up an object.
 
         This method leverages MoveIt to plan and execute a pick motion.
         ROS 2 control manages sending commands to hardware interfaces.
         """
+        # map pixel coordinates to real world coordinates
+
+        # plan and execute to pregrasp pose
+
+        # plan and execute to grasp pose
+
+        # grasp object
+
+        # plan and execute to preplace pose
         raise NotImplementedError
 
-    def place(self, object_id, position, orientation):
+    def transporter_place(self, pixel_coords):
         """
         Place an object.
 
         This method leverages MoveIt to plan and execute a place motion.
         ROS 2 control manages sending commands to hardware interfaces.
         """
+        # map pixel coordinates to real world coordinates
+
+        # plan and execute to place pose
+
+        # release object
+
+        # plan and execute to pregrasp pose
         raise NotImplementedError
 
     @property
