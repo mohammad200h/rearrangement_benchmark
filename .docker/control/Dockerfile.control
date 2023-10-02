@@ -24,6 +24,7 @@ WORKDIR $ROS_UNDERLAY/..
 # copy source code
 COPY mujoco_ravens/ros2_ws/src/control ./src/control
 COPY mujoco_ravens/ros2_ws/src/motion_planning/franka_robotiq ./src/motion_planning/franka_robotiq
+COPY mujoco_ravens/ros2_ws/src/rearrangements ./src/rearrangements
 
 # build source code
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \

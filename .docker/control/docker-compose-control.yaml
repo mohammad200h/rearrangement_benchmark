@@ -16,4 +16,4 @@ services:
       rtprio: 70
       rttime: -1 # corresponds to 'unlimited'
       memlock: 8428281856
-    command: echo "mission accomplished"
+    command: ros2 launch rearrangements control.launch.py
