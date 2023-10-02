@@ -2,7 +2,7 @@ version: "3"
 
 services:
   moveit:
-    image: ghcr.io/ipab-rad/panda_stacking_demo:motion_planning
+    image: ghcr.io/peterdavidfagan/mujoco_ravens_motion_planning
     build:
       context: ../../
       dockerfile: .docker/motion_planning/Dockerfile.motion_planning
@@ -16,4 +16,4 @@ services:
       - "/dev:/dev"
     privileged: true
     network_mode: "host"
-    command: ros2 launch panda_stacking_demo demo_motion_planning.launch.py
+    command: echo "mission accomplished"
