@@ -17,6 +17,11 @@ RUN apt update && apt upgrade -y && \
     cpack -G DEB && \
     dpkg -i libfranka-*.deb
 
+# install moveit via debian (for moveit_config_utils)
+RUN apt update && apt upgrade -y && \
+    apt install -y ros-${ROS_DISTRO}-moveit && \
+    rm -rf /var/lib/apt/lists/*
+
 # set up ROS workspace
 ENV ROS_UNDERLAY /root/ros2_ws/install
 WORKDIR $ROS_UNDERLAY/..
