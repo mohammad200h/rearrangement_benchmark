@@ -58,10 +58,68 @@ class RearrangementTask:
         rclpy.init()
         self.logger = get_logger("rearrangement_task")
         if self.config.task.use_simulation:
+            # docker containers for control and motion planning
             start_control_server()
             start_motion_planning_prerequisites()
+            # start_control_client(self._task_env)
+
+            # moveit configuration
+            # self.moveit_config = (
+            #    MoveItConfigsBuilder(
+            #        robot_name="franka_emika_panda",
+            #        package_name="franka_robotiq_moveit_config",
+            #    )
+            #    .robot_description(
+            #        file_path=get_package_share_directory("franka_robotiq_description") + "/urdf/robot.urdf.xacro",
+            #        mappings={"use_fake_hardware": "true", "robot_ip": "192.168.106.39", "robotiq_gripper": "true"},
+            #    )
+            #    .robot_description_semantic("config/panda.srdf.xacro")
+            #    .trajectory_execution("config/moveit_controllers.yaml")
+            #    .to_moveit_configs()
+            # )
+
+            # moveit client
+            # self.ROBOT = MoveItPy(node_name="moveit_py")
+            # self.ROBOT_ARM = self.FER.get_planning_group("panda_arm")
+
         else:
             raise NotImplementedError
+
+    def _plan_and_execute(
+        self,
+        robot,
+        planning_component,
+        logger,
+        single_plan_parameters=None,
+        multi_plan_parameters=None,
+        sleep_time=0.0,
+    ):
+        """Plan and execute a motion."""
+        # plan to goal
+        logger.info("Planning trajectory")
+        if multi_plan_parameters is not None:
+            plan_result = planning_component.plan(multi_plan_parameters=multi_plan_parameters)
+        elif single_plan_parameters is not None:
+            plan_result = planning_component.plan(single_plan_parameters=single_plan_parameters)
+        else:
+            plan_result = planning_component.plan()
+
+        # execute the plan
+        if plan_result:
+            logger.info("Executing plan")
+            robot_trajectory = plan_result.trajectory
+            robot.execute(robot_trajectory, controllers=[])
+        else:
+            logger.error("Planning failed")
+
+        time.sleep(sleep_time)
+
+    def reset_robot(self):
+        """Reset the robot to a known configuration."""
+        # self.ROBOT_ARM.set_start_state_to_current_state()
+        # self.ROBOT_ARM.set_goal_state(configuration_name="ready")
+        # self._plan_and_execute(self.FER, self.FER_ARM, self.logger, sleep_time=3.0)
+        raise NotImplementedError
 
     def transporter_pick(self, pixel_coords):
         """
@@ -166,3 +224,7 @@ if __name__ == "__main__":
     with task:
         task.render()
         print(task.props)
+        task.reset_robot()
+        import time
+
+        time.sleep(3600)
