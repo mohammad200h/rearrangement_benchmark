@@ -9,4 +9,5 @@
     ├── props.py                # prop creation and addition to scene
     ├── rearrangement_task.py   # high-level API for rearrangement tasks
     ├── robot.py                # robot creation and addition to scene
+    ├── ros2_start_docker.py    # basic utilities for starting docker from Python
     ├── task.py                 # task logic and creation (MoMa)
