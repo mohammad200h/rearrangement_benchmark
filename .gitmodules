@@ -1,12 +1,10 @@
 [submodule "mujoco_ravens/mujoco_menagerie"]
 	path = mujoco_ravens/mujoco_menagerie
 	url = git@github.com:peterdavidfagan/mujoco_menagerie.git
-[submodule "mujoco_ravens/ros2_ws/src/control/ros2_control"]
-	path = mujoco_ravens/ros2_ws/src/control/ros2_control
-	url = git@github.com:peterdavidfagan/ros2_control.git
 [submodule "mujoco_ravens/ros2_ws/src/control/ros2_controllers"]
 	path = mujoco_ravens/ros2_ws/src/control/ros2_controllers
 	url = git@github.com:peterdavidfagan/ros2_controllers.git
+	branch = humble
 [submodule "mujoco_ravens/ros2_ws/src/control/topic_based_ros2_control"]
 	path = mujoco_ravens/ros2_ws/src/control/topic_based_ros2_control
 	url = git@github.com:peterdavidfagan/topic_based_ros2_control.git
