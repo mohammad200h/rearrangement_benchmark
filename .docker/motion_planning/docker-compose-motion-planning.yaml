@@ -16,4 +16,4 @@ services:
       - "/dev:/dev"
     privileged: true
     network_mode: "host"
-    command: echo "mission accomplished"
+    command: ros2 launch rearrangements motion_planning_prerequisites.launch.py

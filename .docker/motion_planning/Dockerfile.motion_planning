@@ -12,6 +12,7 @@ WORKDIR $ROS_UNDERLAY/..
 COPY mujoco_ravens/ros2_ws/src/control/ros2_robotiq_gripper ./src/control/ros2_robotiq_gripper
 COPY mujoco_ravens/ros2_ws/src/control/serial ./src/control/serial
 COPY mujoco_ravens/ros2_ws/src/motion_planning ./src/motion_planning
+COPY mujoco_ravens/ros2_ws/src/rearrangements ./src/rearrangements
 
 # install moveit dependencies
 RUN for repo in ./src/motion_planning/moveit2/moveit2.repos $(f="moveit2/moveit2_$ROS_DISTRO.repos"; test -r $f && echo $f); do vcs import < "$repo"; done
