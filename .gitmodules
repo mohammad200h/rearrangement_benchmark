@@ -11,6 +11,7 @@
 [submodule "mujoco_ravens/ros2_ws/src/motion_planning/moveit2"]
 	path = mujoco_ravens/ros2_ws/src/motion_planning/moveit2
 	url = git@github.com:peterdavidfagan/moveit2.git
+	branch = mujoco_ravens
 [submodule "mujoco_ravens/ros2_ws/src/motion_planning/franka_robotiq"]
 	path = mujoco_ravens/ros2_ws/src/motion_planning/franka_robotiq
 	url = git@github.com:peterdavidfagan/franka_robotiq.git
