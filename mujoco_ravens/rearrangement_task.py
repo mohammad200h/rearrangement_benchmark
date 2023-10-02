@@ -1,10 +1,12 @@
 """A high-level task API for rearrangement tasks that leverage motion planning."""
+import time
 
 import PIL
 import numpy as np
 from task import construct_task_env
 
 from dm_robotics.transformations.transformations import mat_to_quat
+from ros2_start_docker import start_control_server
 
 
 class RearrangementTask:
@@ -19,6 +21,13 @@ class RearrangementTask:
 
         self.config = config
         self.shapes = self.config.props.shapes
+
+        # start control and motion planning software
+        if self.config.task.use_simulation:
+            start_control_server()
+            time.sleep(5)
+        else:
+            raise NotImplementedError
 
         # Automatically reset the task environment on initialization.
         self._task_env.reset()
