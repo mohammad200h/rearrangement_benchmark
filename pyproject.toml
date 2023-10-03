@@ -7,10 +7,6 @@ authors = [
 ]
 readme = "README.md"
 
-#https://github.com/colcon/colcon-core/issues/181
-#[build_scripts]
-#executable=/usr/bin/env python3
-
 [tool.poetry]
 name = "mujoco_ravens"
 version = "0.0.0"
@@ -39,9 +35,9 @@ hydra-core = "^1.3.2"
 catkin-pkg = "^1.0.0"
 colcon-core = "^0.14.0"
 colcon-common-extensions = "^0.3.0"
+colcon-mixin = "^0.2.3"
 pytest = "^7.4.2"
 lark = "^1.1.7"
-colcon-mixin = "^0.2.3"
 
 [tool.black]
 line-length = 120
