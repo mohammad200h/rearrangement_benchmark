@@ -2,7 +2,7 @@
 import numpy as np
 
 from rclpy.node import Node
-from sensor_msgs import JointState
+from sensor_msgs.msg import JointState
 
 from dm_robotics.moma.subtask_env import SubTaskEnvironment
 

@@ -1,4 +1,5 @@
 """A high-level task API for rearrangement tasks that leverage motion planning."""
+import sys
 import threading
 
 import PIL
@@ -13,6 +14,8 @@ from ros2_start_docker import (
     shutdown_motion_planning_prerequisites,
 )
 
+from ament_index_python.packages import get_package_share_directory
+
 # ros 2 client library
 import rclpy
 from rclpy.logging import get_logger
@@ -21,11 +24,13 @@ from rclpy.logging import get_logger
 from sim_control_client import MuJoCoControlClient
 
 # moveit python library
+from moveit_configs_utils import MoveItConfigsBuilder
+
 # from moveit.core.robot_state import RobotState
-# from moveit.planning import (
-#    MoveItPy,
-#    MultiPipelinePlanRequestParameters,
-# )
+from moveit.planning import (
+    MoveItPy,
+    #    MultiPipelinePlanRequestParameters,
+)
 
 
 class RearrangementTask:
@@ -63,34 +68,37 @@ class RearrangementTask:
         rclpy.init()
         self.logger = get_logger("rearrangement_task")
         if self.config.task.use_simulation:
-            # control server + simulation client
-            start_control_server()  # ros 2 control server
-            self.control_client = MuJoCoControlClient(self._task_env)  # node for stepping simulation
-            self.control_client_thread = threading.Thread(target=rclpy.spin, args=(self.control_client,))
-            self.control_client_thread.start()
+            try:
+                # control server + simulation client
+                start_control_server()  # ros 2 control server
+                self.control_client = MuJoCoControlClient(self._task_env)  # node for stepping simulation
+                self.control_client_thread = threading.Thread(target=rclpy.spin, args=(self.control_client,))
+                self.control_client_thread.start()
 
-            # motion planning
-            start_motion_planning_prerequisites()  # static transforms, rviz, etc.
+                # motion planning
+                start_motion_planning_prerequisites()  # static transforms, rviz, etc.
 
-            # moveit configuration
-            # self.moveit_config = (
-            #    MoveItConfigsBuilder(
-            #        robot_name="franka_emika_panda",
-            #        package_name="franka_robotiq_moveit_config",
-            #    )
-            #    .robot_description(
-            #        file_path=get_package_share_directory("franka_robotiq_description") + "/urdf/robot.urdf.xacro",
-            #        mappings={"use_fake_hardware": "true", "robot_ip": "192.168.106.39", "robotiq_gripper": "true"},
-            #    )
-            #    .robot_description_semantic("config/panda.srdf.xacro")
-            #    .trajectory_execution("config/moveit_controllers.yaml")
-            #    .to_moveit_configs()
-            # )
+                # moveit configuration
+                self.moveit_config = (
+                    MoveItConfigsBuilder(
+                        robot_name="franka_emika_panda",
+                        package_name="franka_robotiq_moveit_config",
+                    )
+                    .robot_description(
+                        file_path=get_package_share_directory("franka_robotiq_description") + "/urdf/robot.urdf.xacro",
+                        mappings={"use_fake_hardware": "true", "robot_ip": "192.168.106.39", "robotiq_gripper": "true"},
+                    )
+                    .robot_description_semantic("config/panda.srdf.xacro")
+                    .trajectory_execution("config/moveit_controllers.yaml")
+                    .to_moveit_configs()
+                )
 
-            # moveit client
-            # self.ROBOT = MoveItPy(node_name="moveit_py")
-            # self.ROBOT_ARM = self.FER.get_planning_group("panda_arm")
-
+                # moveit client
+                self.ROBOT = MoveItPy(node_name="moveit_py")
+                self.ROBOT_ARM = self.FER.get_planning_group("panda_arm")
+            except Exception as e:
+                print(e)
+                sys.exit(1)
         else:
             raise NotImplementedError
 
@@ -136,10 +144,9 @@ class RearrangementTask:
 
     def reset_robot(self):
         """Reset the robot to a known configuration."""
-        # self.ROBOT_ARM.set_start_state_to_current_state()
-        # self.ROBOT_ARM.set_goal_state(configuration_name="ready")
-        # self._plan_and_execute(self.FER, self.FER_ARM, self.logger, sleep_time=3.0)
-        raise NotImplementedError
+        self.ROBOT_ARM.set_start_state_to_current_state()
+        self.ROBOT_ARM.set_goal_state(configuration_name="ready")
+        self._plan_and_execute(self.FER, self.FER_ARM, self.logger, sleep_time=3.0)
 
     def transporter_pick(self, pixel_coords):
         """
