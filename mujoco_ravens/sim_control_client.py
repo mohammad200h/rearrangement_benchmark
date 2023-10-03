@@ -40,6 +40,9 @@ class MuJoCoControlClient(Node):
         # step simulation with control command
         self.sim.step(control_command)
 
+        # publish the updated joint state
+        self._publish_joint_state()
+
     def _publish_joint_state(self):
         """Publish joint state from mujoco simulation."""
         joint_state_msg = JointState()
