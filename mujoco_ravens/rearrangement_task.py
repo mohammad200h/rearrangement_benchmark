@@ -1,4 +1,6 @@
 """A high-level task API for rearrangement tasks that leverage motion planning."""
+import threading
+
 import PIL
 import numpy as np
 from task import construct_task_env
@@ -14,6 +16,9 @@ from ros2_start_docker import (
 # ros 2 client library
 import rclpy
 from rclpy.logging import get_logger
+
+# simulation client
+from sim_control_client import MuJoCoControlClient
 
 # moveit python library
 # from moveit.core.robot_state import RobotState
@@ -37,17 +42,17 @@ class RearrangementTask:
         self.config = config
         self.shapes = self.config.props.shapes
 
+    def __enter__(self):
+        """Reset the task environment on entry of context."""
         # start control and motion planning software
         self._start_ros()
 
-    def __enter__(self):
-        """Reset the task environment on entry of context."""
+        # reset the task environment
         self._task_env.reset()
 
     def __exit__(self, type, value, traceback):
         """Shutdown docker containers on exit of context."""
-        shutdown_control_server()
-        shutdown_motion_planning_prerequisites()
+        self._shutdown_ros()
 
     def __del__(self):
         """Close the task environment on instance deletion."""
@@ -58,10 +63,14 @@ class RearrangementTask:
         rclpy.init()
         self.logger = get_logger("rearrangement_task")
         if self.config.task.use_simulation:
-            # docker containers for control and motion planning
-            start_control_server()
-            start_motion_planning_prerequisites()
-            # start_control_client(self._task_env)
+            # control server + simulation client
+            start_control_server()  # ros 2 control server
+            self.control_client = MuJoCoControlClient(self._task_env)  # node for stepping simulation
+            self.control_client_thread = threading.Thread(target=rclpy.spin, args=(self.control_client,))
+            self.control_client_thread.start()
+
+            # motion planning
+            start_motion_planning_prerequisites()  # static transforms, rviz, etc.
 
             # moveit configuration
             # self.moveit_config = (
@@ -84,6 +93,17 @@ class RearrangementTask:
 
         else:
             raise NotImplementedError
+
+    def _shutdown_ros(self):
+        """Shutdown ROS 2 client library."""
+        # shutdown control server + simulation client
+        shutdown_control_server()
+        rclpy.shutdown()
+        self.control_client_thread.join()
+        self.control_client.destroy_node()
+
+        # shutdown motion planning
+        shutdown_motion_planning_prerequisites()
 
     def _plan_and_execute(
         self,
