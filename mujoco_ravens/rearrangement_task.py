@@ -1,4 +1,5 @@
 """A high-level task API for rearrangement tasks that leverage motion planning."""
+import os
 import sys
 import threading
 
@@ -26,9 +27,10 @@ from sim_control_client import MuJoCoControlClient
 # moveit python library
 from moveit_configs_utils import MoveItConfigsBuilder
 
-# from moveit.core.robot_state import RobotState
+from moveit.core.robot_state import RobotState
 from moveit.planning import (
     MoveItPy,
+    PlanRequestParameters,
     #    MultiPipelinePlanRequestParameters,
 )
 
@@ -49,11 +51,11 @@ class RearrangementTask:
 
     def __enter__(self):
         """Reset the task environment on entry of context."""
-        # start control and motion planning software
-        self._start_ros()
-
         # reset the task environment
         self._task_env.reset()
+
+        # start control and motion planning software
+        self._start_ros()
 
     def __exit__(self, type, value, traceback):
         """Shutdown docker containers on exit of context."""
@@ -90,12 +92,20 @@ class RearrangementTask:
                     )
                     .robot_description_semantic("config/panda.srdf.xacro")
                     .trajectory_execution("config/moveit_controllers.yaml")
+                    .moveit_cpp(
+                        file_path=os.path.join(
+                            get_package_share_directory("rearrangements"), "config", "planning_pipelines.yaml"
+                        )
+                    )
                     .to_moveit_configs()
-                )
+                ).to_dict()
 
                 # moveit client
-                self.ROBOT = MoveItPy(node_name="moveit_py")
-                self.ROBOT_ARM = self.FER.get_planning_group("panda_arm")
+                self.ROBOT = MoveItPy(node_name="moveit_py", config_dict=self.moveit_config)
+                self.ROBOT_ARM = self.ROBOT.get_planning_component("panda_arm")
+
+                # import time
+                # time.sleep(100)
             except Exception as e:
                 print(e)
                 sys.exit(1)
@@ -142,11 +152,27 @@ class RearrangementTask:
 
         time.sleep(sleep_time)
 
+    def get_robot_state(self):
+        """Get the current state of the robot."""
+        robot_model = self.ROBOT.get_robot_model()
+        robot_state = RobotState(robot_model)
+
+        # set joints to state from sim
+        robot_state.joint_positions = self.joint_positions
+
+        return robot_state
+
     def reset_robot(self):
         """Reset the robot to a known configuration."""
-        self.ROBOT_ARM.set_start_state_to_current_state()
+        robot_state = self.get_robot_state()
+        self.ROBOT_ARM.set_start_state(robot_state=robot_state)
         self.ROBOT_ARM.set_goal_state(configuration_name="ready")
-        self._plan_and_execute(self.FER, self.FER_ARM, self.logger, sleep_time=3.0)
+        plan_params = PlanRequestParameters(self.ROBOT, "ompl_rrtc")
+        print(plan_params)
+        print(self.ROBOT_ARM.get_start_state().joint_positions)
+        self._plan_and_execute(
+            self.ROBOT, self.ROBOT_ARM, self.logger, sleep_time=3.0, single_plan_parameters=plan_params
+        )
 
     def transporter_pick(self, pixel_coords):
         """
@@ -181,6 +207,45 @@ class RearrangementTask:
 
         # plan and execute to pregrasp pose
         raise NotImplementedError
+
+    @property
+    def joint_names(self) -> dict:
+        """Get joint names."""
+        joint_names = [
+            self._task_env.physics.model.id2name(i, "joint")
+            for i in range(self._task_env.physics.model.njnt)
+            if any(keyword in self._task_env.physics.model.id2name(i, "joint") for keyword in ["nohand/joint"])
+        ]
+        joint_names = ["panda_" + name.split("/")[-1] for name in joint_names]
+        return joint_names
+
+    @property
+    def joint_positions(self) -> dict:
+        """Get joint angles."""
+        joint_names = [
+            self._task_env.physics.model.id2name(i, "joint")
+            for i in range(self._task_env.physics.model.njnt)
+            if any(keyword in self._task_env.physics.model.id2name(i, "joint") for keyword in ["nohand/joint"])
+        ]
+
+        # get joint information
+        joint_positions = self._task_env.physics.named.data.qpos[joint_names]
+        joint_names = ["panda_" + name.split("/")[-1] for name in joint_names]
+        return dict(zip(joint_names, joint_positions))
+
+    @property
+    def joint_velocities(self) -> dict:
+        """Get joint velocities."""
+        joint_names = [
+            self._task_env.physics.model.id2name(i, "joint")
+            for i in range(self._task_env.physics.model.njnt)
+            if any(keyword in self._task_env.physics.model.id2name(i, "joint") for keyword in ["nohand/joint"])
+        ]
+
+        # get joint information
+        joint_velocities = self._task_env.physics.named.data.qvel[joint_names]
+        joint_names = ["panda_" + name.split("/")[-1] for name in joint_names]
+        return dict(zip(joint_names, joint_velocities))
 
     @property
     def props(self) -> dict:
@@ -250,8 +315,12 @@ if __name__ == "__main__":
     # require context manager
     with task:
         task.render()
-        print(task.props)
+        print(task.joint_positions)
         task.reset_robot()
+        print("robot reset")
+        task.render()
+
+        # time to debug
         import time
 
         time.sleep(3600)

@@ -21,6 +21,8 @@ class MuJoCoControlClient(Node):
             "/topic_based_joint_states",
             10,
         )
+        # publish initial joint state
+        self._publish_joint_state()
 
         # create subscription for joint commands
         self.control = self.create_subscription(
@@ -47,8 +49,17 @@ class MuJoCoControlClient(Node):
         """Publish joint state from mujoco simulation."""
         joint_state_msg = JointState()
         joint_state_msg.header.stamp = self.get_clock().now().to_msg()
-        joint_state_msg.name = self.sim.joint_names
-        joint_state_msg.position = self.sim.joint_positions
-        joint_state_msg.velocity = self.sim.joint_velocities
-        joint_state_msg.effort = self.sim.joint_torques
+
+        joint_names = [
+            self.sim.physics.model.id2name(i, "joint")
+            for i in range(self.sim.physics.model.njnt)
+            if any(keyword in self.sim.physics.model.id2name(i, "joint") for keyword in ["nohand/joint"])
+        ]
+        joint_positions = self.sim.physics.named.data.qpos[joint_names]
+        joint_velocities = self.sim.physics.named.data.qvel[joint_names]
+        joint_names = ["panda_" + name.split("/")[-1] for name in joint_names]
+        joint_state_msg.name = joint_names
+        joint_state_msg.position = list(joint_positions)
+        joint_state_msg.velocity = list(joint_velocities)
+        print(joint_state_msg)
         self.state_publisher.publish(joint_state_msg)
