@@ -2,21 +2,87 @@ arm:
   _target_: mujoco_ravens.models.arms.franka_emika.FER
   relative_robot_mjcf_path: "./mujoco_menagerie/franka_emika_panda/panda_nohand.xml" # relative to scripts directory
   actuator_config:
-    type: "motor"
-    high_torque_motor:
-      ctrlrange: '-87 87'
-      forcerange: '-87 87'
-    low_torque_motor:
-      ctrlrange: '-12 12'
-      forcerange: '-12 12'
+    type: "general"
+    default:
+      dyntype: "none"
+      biastype: "affine"
+      ctrlrange: "-2.8973 2.8973"
+      forcerange: "-87 87"
+    joint1:
+      dyntype: ${robots.arm.actuator_config.default.dyntype}
+      biastype: ${robots.arm.actuator_config.default.biastype}
+      ctrlrange: ${robots.arm.actuator_config.default.ctrlrange}
+      forcerange: ${robots.arm.actuator_config.default.forcerange}
+      gainprm: "4500"
+      biasprm: "0 -4500 -450"
+    joint2:
+      dyntype: ${robots.arm.actuator_config.default.dyntype}
+      biastype: ${robots.arm.actuator_config.default.biastype}
+      ctrlrange: "-1.7628 1.7628"
+      forcerange: ${robots.arm.actuator_config.default.forcerange}
+      gainprm: "4500"
+      biasprm: "0 -4500 -450"
+    joint3:
+      dyntype: ${robots.arm.actuator_config.default.dyntype}
+      biastype: ${robots.arm.actuator_config.default.biastype}
+      ctrlrange: ${robots.arm.actuator_config.default.ctrlrange}
+      forcerange: ${robots.arm.actuator_config.default.forcerange}
+      gainprm: "3500"
+      biasprm: "0 -3500 -350"
+    joint4:
+      dyntype: ${robots.arm.actuator_config.default.dyntype}
+      biastype: ${robots.arm.actuator_config.default.biastype}
+      ctrlrange: -3.0718 -0.0698
+      forcerange: ${robots.arm.actuator_config.default.forcerange}
+      gainprm: "3500"
+      biasprm: "0 -3500 -350"
+    joint5:
+      dyntype: ${robots.arm.actuator_config.default.dyntype}
+      biastype: ${robots.arm.actuator_config.default.biastype}
+      ctrlrange: ${robots.arm.actuator_config.default.ctrlrange}
+      forcerange: "-12 12"
+      gainprm: "2000"
+      biasprm: "0 -2000 -200"
+    joint6:
+      dyntype: ${robots.arm.actuator_config.default.dyntype}
+      biastype: ${robots.arm.actuator_config.default.biastype}
+      ctrlrange: "-0.0175 3.7525"
+      forcerange: "-12 12"
+      gainprm: "2000"
+      biasprm: "0 -2000 -200"
+    joint7:
+      dyntype: ${robots.arm.actuator_config.default.dyntype}
+      biastype: ${robots.arm.actuator_config.default.biastype}
+      ctrlrange: ${robots.arm.actuator_config.default.ctrlrange}
+      forcerange: "-12 12"
+      gainprm: "2000"
+      biasprm: "0 -2000 -200"
+
     joint_actuator_mapping:
-      joint1: "high_torque_motor"
-      joint2: "high_torque_motor"
-      joint3: "high_torque_motor"
-      joint4: "high_torque_motor"
-      joint5: "low_torque_motor"
-      joint6: "low_torque_motor"
-      joint7: "low_torque_motor"
+      joint1: "joint1"
+      joint2: "joint2"
+      joint3: "joint3"
+      joint4: "joint4"
+      joint5: "joint5"
+      joint6: "joint6"
+      joint7: "joint7"
+
+    ## torque based motor
+    #type: "motor"
+    #high_torque_motor:
+    #  ctrlrange: '-87 87'
+    #  forcerange: '-87 87'
+    #low_torque_motor:
+    #  ctrlrange: '-12 12'
+    #  forcerange: '-12 12'
+    #joint_actuator_mapping:
+    #  joint1: "high_torque_motor"
+    #  joint2: "high_torque_motor"
+    #  joint3: "high_torque_motor"
+    #  joint4: "high_torque_motor"
+    #  joint5: "low_torque_motor"
+    #  joint6: "low_torque_motor"
+    #  joint7: "low_torque_motor"
 
 
 gripper:
