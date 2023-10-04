@@ -53,6 +53,8 @@ def generate_launch_description():
         parameters=[moveit_config.robot_description],
     )
 
+    print(moveit_config.robot_description)
+
     # setup rviz
     rviz_config = os.path.join(get_package_share_directory("rearrangements"), "config", "motion_planning.rviz")
 

@@ -41,7 +41,7 @@ def generate_launch_description():
         package="joint_state_publisher",
         executable="joint_state_publisher",
         name="joint_state_publisher",
-        parameters=[{"source_list": ["franka/joint_states"], "rate": 30}],
+        parameters=[{"source_list": ["/topic_based_joint_states"], "rate": 10}],
     )
 
     # ros 2 controllers
@@ -58,7 +58,7 @@ def generate_launch_description():
             moveit_config.robot_description,
             ros2_controllers_path,
         ],
-        remappings=[("joint_states", "franka/joint_states")],
+        remappings=[("/joint_states", "/topic_based_joint_states")],
         output={
             "stdout": "screen",
             "stderr": "screen",
