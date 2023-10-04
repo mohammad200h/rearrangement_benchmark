@@ -121,13 +121,16 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
     base_env = env_builder.build_base_env()
     parent_action_spec = task.effectors_action_spec(physics=base_env.physics, effectors=task.effectors)
 
-    # define a dummy action:
     # https://github.com/google-deepmind/dm_robotics/blob/e4631a91363b3f7b05bc848e818ad6485292f110/py/agentflow/options/basic_options.py#L103
     # TODO: fix this logic based on selected control interface (e.g. position, velocity, torque)
-    # currently choosing zeros results in a validation error
-    min_action = parent_action_spec.minimum
-    noop_action = np.ones(parent_action_spec.shape, dtype=parent_action_spec.dtype) * min_action
-    # noop_action = af.spec_utils.zeros(parent_action_spec)
+    # currently choosing zeros for position control results in a validation error
+    if cfg.robots.arm.actuator_config.type == "general":  # in this case general is position control
+        noop_action = np.array([0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785, 0.0], dtype=np.float32)
+    elif cfg.robots.arm.actuator_config.type == "motor":
+        noop_action = af.spec_utils.zeros(parent_action_spec)
+    else:
+        raise ValueError(f"Unsupported actuator type: {cfg.robots.arm.actuator_config.type}")
+
     delegate = af.FixedOp(noop_action, name="NoOp")
     reset_option = moma_option.MomaOption(
         physics_getter=lambda: base_env.physics,

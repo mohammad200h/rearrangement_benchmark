@@ -1,14 +1,9 @@
 """A high-level task API for rearrangement tasks that leverage motion planning."""
 import os
 import sys
-import threading
+import subprocess
 
-import PIL
-import numpy as np
-from task import construct_task_env
-
-from dm_robotics.transformations.transformations import mat_to_quat
-from ros2_start_docker import (
+from ros_start_docker import (
     start_control_server,
     shutdown_control_server,
     start_motion_planning_prerequisites,
@@ -19,10 +14,8 @@ from ament_index_python.packages import get_package_share_directory
 
 # ros 2 client library
 import rclpy
+from rclpy.node import Node
 from rclpy.logging import get_logger
-
-# simulation client
-from sim_control_client import MuJoCoControlClient
 
 # moveit python library
 from moveit_configs_utils import MoveItConfigsBuilder
@@ -35,82 +28,76 @@ from moveit.planning import (
 )
 
 
-class RearrangementTask:
+class RearrangementTask(Node):
     """A high-level task API for rearrangement tasks that leverage motion planning."""
 
-    def __init__(self, config):
+    def __init__(self, config=None):
         """Initialize the rearrangement task."""
-        # set up simulation environment
-        if config is None:
-            self._task_env, config = construct_task_env()
-        else:
-            self._task_env, _ = construct_task_env(config)
+        super().__init__("rearrangement_task")
 
         self.config = config
-        self.shapes = self.config.props.shapes
 
     def __enter__(self):
         """Reset the task environment on entry of context."""
-        # reset the task environment
-        self._task_env.reset()
-
-        # start control and motion planning software
+        # sets up ros 2 nodes
         self._start_ros()
+
+        # reset the task environment
+
+        # wait for the task environment to be ready
+        import time
+
+        time.sleep(15)
 
     def __exit__(self, type, value, traceback):
         """Shutdown docker containers on exit of context."""
         self._shutdown_ros()
 
-    def __del__(self):
-        """Close the task environment on instance deletion."""
-        self._task_env.close()
+    # def __del__(self):
+    #    """Close the task environment on instance deletion."""
 
     def _start_ros(self):
         """Start ROS 2 client library."""
-        rclpy.init()
         self.logger = get_logger("rearrangement_task")
-        if self.config.task.use_simulation:
-            try:
-                # control server + simulation client
-                start_control_server()  # ros 2 control server
-                self.control_client = MuJoCoControlClient(self._task_env)  # node for stepping simulation
-                self.control_client_thread = threading.Thread(target=rclpy.spin, args=(self.control_client,))
-                self.control_client_thread.start()
+        # if self.config.task.use_simulation:
+        try:
+            # TODO: move to docker container
+            # simulation client
+            subprocess.Popen(["python", "ros_mujoco_client.py"])
 
-                # motion planning
-                start_motion_planning_prerequisites()  # static transforms, rviz, etc.
+            # control server
+            start_control_server()
 
-                # moveit configuration
-                self.moveit_config = (
-                    MoveItConfigsBuilder(
-                        robot_name="franka_emika_panda",
-                        package_name="franka_robotiq_moveit_config",
+            # motion planning
+            start_motion_planning_prerequisites()  # static transforms, rviz, etc.
+
+            # moveit configuration
+            self.moveit_config = (
+                MoveItConfigsBuilder(
+                    robot_name="franka_emika_panda",
+                    package_name="franka_robotiq_moveit_config",
+                )
+                .robot_description(
+                    file_path=get_package_share_directory("franka_robotiq_description") + "/urdf/robot.urdf.xacro",
+                    mappings={"use_fake_hardware": "true", "robot_ip": "192.168.106.39", "robotiq_gripper": "true"},
+                )
+                .robot_description_semantic("config/panda.srdf.xacro")
+                .trajectory_execution("config/moveit_controllers.yaml")
+                .moveit_cpp(
+                    file_path=os.path.join(
+                        get_package_share_directory("rearrangements"), "config", "planning_pipelines.yaml"
                     )
-                    .robot_description(
-                        file_path=get_package_share_directory("franka_robotiq_description") + "/urdf/robot.urdf.xacro",
-                        mappings={"use_fake_hardware": "true", "robot_ip": "192.168.106.39", "robotiq_gripper": "true"},
-                    )
-                    .robot_description_semantic("config/panda.srdf.xacro")
-                    .trajectory_execution("config/moveit_controllers.yaml")
-                    .moveit_cpp(
-                        file_path=os.path.join(
-                            get_package_share_directory("rearrangements"), "config", "planning_pipelines.yaml"
-                        )
-                    )
-                    .to_moveit_configs()
-                ).to_dict()
+                )
+                .to_moveit_configs()
+            ).to_dict()
 
-                # moveit client
-                self.ROBOT = MoveItPy(node_name="moveit_py", config_dict=self.moveit_config)
-                self.ROBOT_ARM = self.ROBOT.get_planning_component("panda_arm")
+            # moveit client
+            self.ROBOT = MoveItPy(node_name="moveit_py", config_dict=self.moveit_config)
+            self.ROBOT_ARM = self.ROBOT.get_planning_component("panda_arm")
 
-                # import time
-                # time.sleep(100)
-            except Exception as e:
-                print(e)
-                sys.exit(1)
-        else:
-            raise NotImplementedError
+        except Exception as e:
+            print(e)
+            sys.exit(1)
 
     def _shutdown_ros(self):
         """Shutdown ROS 2 client library."""
@@ -150,26 +137,35 @@ class RearrangementTask:
         else:
             logger.error("Planning failed")
 
-        time.sleep(sleep_time)
-
-    def get_robot_state(self):
-        """Get the current state of the robot."""
-        robot_model = self.ROBOT.get_robot_model()
-        robot_state = RobotState(robot_model)
-
-        # set joints to state from sim
-        robot_state.joint_positions = self.joint_positions
-
-        return robot_state
-
     def reset_robot(self):
         """Reset the robot to a known configuration."""
-        robot_state = self.get_robot_state()
-        self.ROBOT_ARM.set_start_state(robot_state=robot_state)
-        self.ROBOT_ARM.set_goal_state(configuration_name="ready")
+        # fix starting joint configuration
+        # start_joint_config = {
+        #        "panda_joint1": 0.0,
+        #        "panda_joint2": -0.785,
+        #        "panda_joint3": 0.0,
+        #        "panda_joint4": -2.356,
+        #        "panda_joint5": 0.0,
+        #        "panda_joint6": 1.571,
+        #        "panda_joint7": 0.785,
+        #        }
+        # robot_state.joint_positions = start_joint_config
+
+        # set start to current sim state (should be read from robot_state_publisher)
+        self.ROBOT_ARM.set_start_state_to_current_state()
+        start_state = self.ROBOT_ARM.get_start_state()
+        print(f"start_state: {start_state.joint_positions}")
+
+        # set random target
+        robot_model = self.ROBOT.get_robot_model()
+        robot_state = RobotState(robot_model)
+        robot_state.set_to_random_positions()
+        self.ROBOT_ARM.set_goal_state(robot_state=robot_state)
+
+        print(f"robot_state: {robot_state.joint_positions}")
+
+        # perform motion planning
         plan_params = PlanRequestParameters(self.ROBOT, "ompl_rrtc")
-        print(plan_params)
-        print(self.ROBOT_ARM.get_start_state().joint_positions)
         self._plan_and_execute(
             self.ROBOT, self.ROBOT_ARM, self.logger, sleep_time=3.0, single_plan_parameters=plan_params
         )
@@ -208,119 +204,18 @@ class RearrangementTask:
         # plan and execute to pregrasp pose
         raise NotImplementedError
 
-    @property
-    def joint_names(self) -> dict:
-        """Get joint names."""
-        joint_names = [
-            self._task_env.physics.model.id2name(i, "joint")
-            for i in range(self._task_env.physics.model.njnt)
-            if any(keyword in self._task_env.physics.model.id2name(i, "joint") for keyword in ["nohand/joint"])
-        ]
-        joint_names = ["panda_" + name.split("/")[-1] for name in joint_names]
-        return joint_names
-
-    @property
-    def joint_positions(self) -> dict:
-        """Get joint angles."""
-        joint_names = [
-            self._task_env.physics.model.id2name(i, "joint")
-            for i in range(self._task_env.physics.model.njnt)
-            if any(keyword in self._task_env.physics.model.id2name(i, "joint") for keyword in ["nohand/joint"])
-        ]
-
-        # get joint information
-        joint_positions = self._task_env.physics.named.data.qpos[joint_names]
-        joint_names = ["panda_" + name.split("/")[-1] for name in joint_names]
-        return dict(zip(joint_names, joint_positions))
-
-    @property
-    def joint_velocities(self) -> dict:
-        """Get joint velocities."""
-        joint_names = [
-            self._task_env.physics.model.id2name(i, "joint")
-            for i in range(self._task_env.physics.model.njnt)
-            if any(keyword in self._task_env.physics.model.id2name(i, "joint") for keyword in ["nohand/joint"])
-        ]
-
-        # get joint information
-        joint_velocities = self._task_env.physics.named.data.qvel[joint_names]
-        joint_names = ["panda_" + name.split("/")[-1] for name in joint_names]
-        return dict(zip(joint_names, joint_velocities))
-
-    @property
-    def props(self) -> dict:
-        """
-        Gets domain model.
-
-        The domain model is a dictionary of objects and their properties.
-        """
-        # get prop object names
-        prop_names = [
-            self._task_env.physics.model.id2name(i, "geom")
-            for i in range(self._task_env.physics.model.ngeom)
-            if any(keyword in self._task_env.physics.model.id2name(i, "geom") for keyword in self.shapes)
-        ]
-        prop_ids = [self._task_env.physics.model.name2id(name, "geom") for name in prop_names]
-
-        # get object information
-        prop_positions = self._task_env.physics.named.data.geom_xpos[prop_names]
-        prop_orientations = self._task_env.physics.named.data.geom_xmat[prop_names]
-        prop_orientations = [mat_to_quat(mat.reshape((3, 3))) for mat in prop_orientations]
-        prop_rgba = self._task_env.physics.named.model.geom_rgba[prop_names]
-        prop_names = [name.split("/")[0] for name in prop_names]
-
-        # get object bounding box information
-        def get_bbox(prop_id, segmentation_map):
-            """Get the bounding box of an object (PASCAL VOC)."""
-            prop_coords = np.argwhere(segmentation_map[:, :, 0] == prop_id)
-            bbox_corners = np.array(
-                [
-                    np.min(prop_coords[:, 0]),
-                    np.min(prop_coords[:, 1]),
-                    np.max(prop_coords[:, 0]),
-                    np.max(prop_coords[:, 1]),
-                ]
-            )
-
-            return bbox_corners
-
-        # TODO: consider vectorizing this
-        segmentation_map = self._task_env.physics.render(segmentation=True)
-        prop_bbox = []
-        for idx in prop_ids:
-            bbox = get_bbox(idx, segmentation_map)
-            prop_bbox.append(bbox)
-
-        # create a dictionary with all the data
-        prop_info = {
-            prop_names[i]: {
-                "position": prop_positions[i],
-                "orientation": prop_orientations[i],
-                "rgba": prop_rgba[i],
-                "bbox": prop_bbox[i],
-            }
-            for i in range(len(prop_names))
-        }
-
-        return prop_info
-
-    def render(self):
-        """Render the task environment."""
-        pixels = self._task_env.physics.render()
-        PIL.Image.fromarray(pixels).show()
+    # def render(self):
+    #    """Render the task environment."""
+    #    pixels = self._task_env.physics.render()
+    #    PIL.Image.fromarray(pixels).show()
 
 
 if __name__ == "__main__":
+    rclpy.init()
     task = RearrangementTask(None)
-    # require context manager
     with task:
-        task.render()
-        print(task.joint_positions)
         task.reset_robot()
-        print("robot reset")
-        task.render()
-
-        # time to debug
+        print("sleeping")
         import time
 
         time.sleep(3600)
