@@ -29,3 +29,6 @@
 	path = mujoco_ravens/ros2_ws/src/control/franka_ros2
 	url = git@github.com:peterdavidfagan/franka_ros2.git
 	branch = mujoco_ravens
+[submodule "mujoco_ravens/ros2_robotics_research_toolkit"]
+	path = mujoco_ravens/ros2_robotics_research_toolkit
+	url = git@github.com:peterdavidfagan/ros2_robotics_research_toolkit.git
