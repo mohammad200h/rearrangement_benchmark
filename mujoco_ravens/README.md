@@ -14,3 +14,7 @@
     ├── ros2_rearrangement.py                          # ROS 2 reliant high-level API for rearrangement tasks
     ├── ros2_start_docker.py                           # basic utilities for starting docker from Python
     ├── task.py                                        # task logic and creation (MoMa)
+
+# Rearrangement API
+
+# ROS Rearrangement API
