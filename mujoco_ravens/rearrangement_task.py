@@ -2,10 +2,12 @@
 
 import numpy as np
 from ikpy.chain import Chain
+from dm_robotics.transformations.transformations import mat_to_quat
 
 import PIL
 
 from task import construct_task_env
+
 
 URDF_PATH = "./robot.urdf"
 
@@ -15,8 +17,9 @@ class RearrangementTask(object):
     def __init__(self):
         """Initializes a rearrangement task."""
         self._sim, self.config = construct_task_env()
+        self.shapes = self.config.props.shapes
         self.ee_chain = Chain.from_urdf_file(URDF_PATH, base_elements=["panda_link0"]) # TODO: read from config
-        
+
         # current status of the robot
         self.gripper_status = "open"
         self.joint_angles = None 
@@ -137,13 +140,70 @@ class RearrangementTask(object):
         PIL.Image.fromarray(left_camera).show()
         right_camera = obs[3]["right_camera_rgb_img"].astype(np.uint8)
         PIL.Image.fromarray(right_camera).show()
+    
+    @property
+    def props(self) -> dict:
+       """
+       Gets domain model.
+       
+       The domain model is a dictionary of objects and their properties.
+       """
+       # get prop object names
+       prop_names = [
+           self._sim.physics.model.id2name(i, "geom")
+           for i in range(self._sim.physics.model.ngeom)
+           if any(keyword in self._sim.physics.model.id2name(i, "geom") for keyword in self.shapes)
+       ]
+       prop_ids = [self._sim.physics.model.name2id(name, "geom") for name in prop_names]
 
+       # get object information
+       prop_positions = self._sim.physics.named.data.geom_xpos[prop_names]
+       prop_orientations = self._sim.physics.named.data.geom_xmat[prop_names]
+       prop_orientations = [mat_to_quat(mat.reshape((3, 3))) for mat in prop_orientations]
+       prop_rgba = self._sim.physics.named.model.geom_rgba[prop_names]
+       prop_names = [name.split("/")[0] for name in prop_names]
+
+       # get object bounding box information
+       def get_bbox(prop_id, segmentation_map):
+           """Get the bounding box of an object (PASCAL VOC)."""
+           prop_coords = np.argwhere(segmentation_map[:, :, 0] == prop_id)
+           bbox_corners = np.array(
+               [
+                   np.min(prop_coords[:, 0]),
+                   np.min(prop_coords[:, 1]),
+                   np.max(prop_coords[:, 0]),
+                   np.max(prop_coords[:, 1]),
+               ]
+           )
+
+           return bbox_corners
+
+       # TODO: consider vectorizing this
+       segmentation_map = self._sim.physics.render(segmentation=True)
+       prop_bbox = []
+       for idx in prop_ids:
+           bbox = get_bbox(idx, segmentation_map)
+           prop_bbox.append(bbox)
+
+       # create a dictionary with all the data
+       prop_info = {
+           prop_names[i]: {
+               "position": prop_positions[i],
+               "orientation": prop_orientations[i],
+               "rgba": prop_rgba[i],
+               "bbox": prop_bbox[i],
+           }
+           for i in range(len(prop_names))
+       }
+
+       return prop_info
 
 if __name__=="__main__":
     task = RearrangementTask()
     obs = task.reset()
     task.display_cameras()
-    
+    print(task.props)
+
     # use move_eef function
     status, obs = task.move_eef(np.array([0.6, 0.25, 0.4]))
     obs = task.open_gripper()
