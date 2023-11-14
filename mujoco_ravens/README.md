@@ -17,4 +17,4 @@
 
 # Rearrangement API
 
-# ROS Rearrangement API
+# ROS 2 Rearrangement API
