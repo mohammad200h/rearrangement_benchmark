@@ -6,22 +6,22 @@
   fovy: 120
 
 - name: overhead_camera
-  pos: [0.4, 0.0, 2.0]
-  quat: [0.7068252, 0, 0, 0.7073883]
+  pos: [0.8, 0.0, 2.0]
+  quat: [0.704416, 0.0616284, 0.0616284, 0.704416]
   height: 640
   width: 640
   fovy: 120
 
-    #- left_camera:
-    #  pos: []
-    #  quat: []
-    #  height: 640
-    #  width: 640
-    #  fov: 120
-    #
-    #- right_camera:
-    #  pos: []
-    #  quat: []
-    #  height: 640
-    #  width: 640
-    #  fov: 120
+- name: left_camera
+  pos: [0.4, 1.6, 1.4]
+  quat: [0, 0, 0.5, 0.8660254]
+  height: 640
+  width: 640
+  fovy: 120
+
+- name: right_camera
+  pos: [0.4, -1.6, 1.4]
+  quat: [0.8660254, 0.5, 0, 0]
+  height: 640
+  width: 640
+  fovy: 120
