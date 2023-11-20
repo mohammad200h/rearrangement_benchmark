@@ -6,10 +6,10 @@ from dm_robotics.transformations.transformations import mat_to_quat
 
 import PIL
 
-from env_components.task import construct_task_env
+from rearrangement_benchmark.task import construct_task_env
 
 
-URDF_PATH = "./robot.urdf"
+URDF_PATH = "./models/arms/robot.urdf"
 
 class RearrangementTask(object):
     """A high-level API for performing rearrangement tasks."""
