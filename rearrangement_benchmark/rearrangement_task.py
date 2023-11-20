@@ -6,7 +6,7 @@ from dm_robotics.transformations.transformations import mat_to_quat
 
 import PIL
 
-from task import construct_task_env
+from env_components.task import construct_task_env
 
 
 URDF_PATH = "./robot.urdf"

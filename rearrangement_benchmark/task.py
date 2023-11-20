@@ -4,8 +4,8 @@
 from hydra import compose, initialize
 from omegaconf import DictConfig
 
-from base_scene import construct_base_scene
-from robot import setup_robot_manipulator
+from rearrangement_benchmark.env_components.base_scene import construct_base_scene
+from rearrangement_benchmark.env_components.robot import setup_robot_manipulator
 
 from dm_robotics.moma import action_spaces
 from dm_robotics.moma import base_task
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     import PIL
 
     # test the environment
-    task_env = construct_task_env()
+    task_env, config = construct_task_env()
     obs = task_env.reset()
     front_camera = obs[3]["front_camera_rgb_img"].astype(np.uint8)
     PIL.Image.fromarray(front_camera).show()

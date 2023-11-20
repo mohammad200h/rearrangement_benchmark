@@ -12,8 +12,8 @@ from dm_robotics.moma import robot
 from dm_control import composer, mjcf
 
 # custom props
-from props import add_objects, Rectangle
-from cameras import add_camera
+from rearrangement_benchmark.env_components.props import add_objects, Rectangle
+from rearrangement_benchmark.env_components.cameras import add_camera
 
 # config
 import hydra
@@ -74,7 +74,7 @@ def add_robot_and_gripper(arena: composer.Arena, arm, gripper) -> Tuple[composer
     return arm, gripper
 
 
-@hydra.main(version_base=None, config_path="./config", config_name="scene")
+@hydra.main(version_base=None, config_path="../config", config_name="scene")
 def construct_base_scene(cfg: DictConfig) -> None:
     """Build a base scene for robot manipulation tasks."""
     # build the base arena
