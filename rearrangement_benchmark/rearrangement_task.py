@@ -14,9 +14,14 @@ URDF_PATH = "./models/arms/robot.urdf"
 class RearrangementTask(object):
     """A high-level API for performing rearrangement tasks."""
 
-    def __init__(self):
+    def __init__(self, cfg=None):
         """Initializes a rearrangement task."""
-        self._sim, self.config = construct_task_env()
+        # if a config is provided overwrite the default config
+        if cfg is not None:
+            self._sim, self.config = construct_task_env(cfg)
+        else:
+            self._sim, self.config = construct_task_env()
+
         self.shapes = self.config.props.shapes
         self.ee_chain = Chain.from_urdf_file(URDF_PATH, base_elements=["panda_link0"]) # TODO: read from config
 

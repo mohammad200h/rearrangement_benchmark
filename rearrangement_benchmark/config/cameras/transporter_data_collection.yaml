@@ -1,0 +1,7 @@
+- name: overhead_camera
+  pos: [0.8, 0.0, 2.0]
+  quat: [0.704416, 0.0616284, 0.0616284, 0.704416]
+  height: 640
+  width: 640
+  fovy: 120
+
