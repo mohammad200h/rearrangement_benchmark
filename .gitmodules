@@ -5,3 +5,6 @@
 	path = rearrangement_benchmark/ros2_robotics_research_toolkit
 	url = git@github.com:peterdavidfagan/ros2_robotics_research_toolkit.git
 	branch = franka_emika_panda
+[submodule "rearrangement_benchmark/transporter_networks"]
+	path = rearrangement_benchmark/transporter_networks
+	url = git@github.com:peterdavidfagan/transporter_networks.git
