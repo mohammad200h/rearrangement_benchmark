@@ -1,7 +1,7 @@
-[submodule "mujoco_ravens/mujoco_menagerie"]
-	path = mujoco_ravens/mujoco_menagerie
+[submodule "rearrangement_benchmark/mujoco_menagerie"]
+	path = rearrangement_benchmark/mujoco_menagerie
 	url = git@github.com:peterdavidfagan/mujoco_menagerie.git
-[submodule "mujoco_ravens/ros2_robotics_research_toolkit"]
-	path = mujoco_ravens/ros2_robotics_research_toolkit
+[submodule "rearrangement_benchmark/ros2_robotics_research_toolkit"]
+	path = rearrangement_benchmark/ros2_robotics_research_toolkit
 	url = git@github.com:peterdavidfagan/ros2_robotics_research_toolkit.git
 	branch = franka_emika_panda
