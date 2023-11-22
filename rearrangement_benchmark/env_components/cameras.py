@@ -11,12 +11,15 @@ def _make_fixed_camera(
     name: str,
     pos: Tuple = (0.0, 0.0, 0.0),
     quat: Tuple = (0.0, 0.0, 0.0, 1.0),
+    height: int = 640,
+    width: int = 480,
+    fovy: float = 90.0,
 ) -> None:
     """Create fixed camera."""
     mjcf_root = mjcf.element.RootElement(model=name)
     prop_root = mjcf_root.worldbody.add(
         "body",
-        name="prop_root",
+        name=f"{name}_root",
     )
     camera = prop_root.add(
         "camera",
@@ -24,7 +27,11 @@ def _make_fixed_camera(
         mode="fixed",
         pos=pos,
         quat=quat,
+        fovy=fovy,
     )
+    print(mjcf_root)
+    print(prop_root)
+    print(camera)
 
     return mjcf_root, camera
 
@@ -37,7 +44,7 @@ class FixedCamera(Camera):
         name: str,
         pos: str = "0 0 0",
         quat: str = "0 0 0 1",
-        height: int = 480,
+        height: int = 640,
         width: int = 480,
         fovy: float = 90.0,
     ) -> None:
@@ -47,6 +54,9 @@ class FixedCamera(Camera):
             name,
             pos,
             quat,
+            height,
+            width,
+            fovy,
         )
 
         # build the camera
@@ -54,7 +64,7 @@ class FixedCamera(Camera):
             name=name,
             mjcf_root=mjcf_root,
             camera_element=name,
-            prop_root="prop_root",
+            prop_root=f"{name}_root",
             width=width,
             height=height,
             fovy=fovy,
@@ -84,7 +94,6 @@ def add_camera(
 
     # attach to arena
     arena.mjcf_model.attach(camera.mjcf_model)
-    # frame = arena.add_free_entity(camera)
 
     # create camera sensors
     camera_config = CameraConfig(

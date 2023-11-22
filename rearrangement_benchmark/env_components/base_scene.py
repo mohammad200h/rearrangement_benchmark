@@ -38,8 +38,8 @@ def add_basic_table(arena: composer.Arena) -> Rectangle:
     """Add a basic table to the arena."""
     table = Rectangle(
         name="table",
-        x_len=0.6,
-        y_len=0.8,
+        x_len=0.8,
+        y_len=1.0,
         z_len=0.4,
         rgba=(0.5, 0.5, 0.5, 1.0),
     )
@@ -114,6 +114,7 @@ def construct_base_scene(cfg: DictConfig) -> None:
             width=camera.width,
             fovy=camera.fovy,
         )
+        
         extra_sensors += camera_sensor
 
     # build the physics

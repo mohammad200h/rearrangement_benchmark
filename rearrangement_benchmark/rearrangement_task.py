@@ -2,7 +2,7 @@
 
 import numpy as np
 from ikpy.chain import Chain
-from dm_robotics.transformations.transformations import mat_to_quat
+from dm_robotics.transformations.transformations import mat_to_quat, quat_to_mat, quat_to_euler
 
 import PIL
 
@@ -44,6 +44,53 @@ class RearrangementTask(object):
         obs = self._sim.reset()
         self.update_internal_vars(obs)
         return obs
+    
+    def pixel_2_world(self, camera_name, coords):
+        """Returns the world coordinates for a given pixel in camera."""
+        width, height = [480, 640] # TODO: read from config
+        
+        # Investigate the mjcf cause I didn't know what the heck was going on with cameras :)
+        #from dm_control.mjcf import export_with_assets
+        #mjcf_model = self._sim._env._task.root_entity.mjcf_model
+        #export_with_assets(mjcf_model, ".", "test.xml")
+
+        # get camera parameters
+        # Note: MoMa employs opencv camera convention where +z faces the scene
+        # this is different from mujoco where -z faces the scene
+        # this was confusing on first pass over both APIs
+        intrinsics = self.obs[3][camera_name + "_intrinsics"]
+        
+        # manually calculate the intrinsics as a sanity check!!!
+        #mj_fovy = self._sim._env.physics.named.model.cam_fovy["overhead_camera/overhead_camera"]
+        #half_angle_rad = np.deg2rad(mj_fovy / 2.0)
+        #focal_length = (height / 2.0) / np.tan(half_angle_rad)
+        #intrinsics = np.array([
+        #    [focal_length, 0.0, (width-1) / 2.0, 0.0], 
+        #    [0.0, focal_length, (height-1) / 2.0, 0.0], 
+        #    [0.0, 0.0, 1.0, 0.0]
+        #    ])
+        #print("intrinsics: {}".format(intrinsics[:3,:3]))
+        
+        # get camera position and orientation (from MoMa's perspective)
+        pos = self.obs[3][camera_name + "_pos"]
+        quat = self.obs[3][camera_name + "_quat"]
+        depth_val = self.obs[3][camera_name + "_depth_img"][coords[1], coords[0]]
+        
+        # convert to camera frame coordinates
+        image_coords = np.expand_dims(np.concatenate([coords, np.ones(1)]), axis=-1)
+        camera_coords =  np.linalg.inv(intrinsics[:3,:3]) @ image_coords
+        camera_coords = np.squeeze(camera_coords * depth_val)
+
+        # convert camera coordinates to world coordinates
+        world_to_camera = np.eye(4)
+        world_to_camera[:3, :3] = quat_to_mat(quat)[:3,:3].T
+        world_to_camera[:3, 3] = -quat_to_mat(quat)[:3,:3].T @ pos
+        world_coords = world_to_camera @ np.concatenate([np.squeeze(camera_coords), np.ones(1)])
+        world_coords = world_coords[:3] / world_coords[3]
+
+        return world_coords
+
+
 
     def move_eef(self, target, max_iters=100):
         """Moves the end effector to the target position, while maintaining upright orientation.
@@ -207,7 +254,6 @@ if __name__=="__main__":
     task = RearrangementTask()
     obs = task.reset()
     task.display_cameras()
-    print(task.props)
 
     # use move_eef function
     status, obs = task.move_eef(np.array([0.6, 0.25, 0.4]))
