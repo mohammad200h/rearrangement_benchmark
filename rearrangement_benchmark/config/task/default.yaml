@@ -2,9 +2,9 @@ use_simulation: True # whether we are running a simulated or real experiment
 
 initializers:
   workspace:
-    min_pose: [0.45, -0.3, 0.45, 0.0, 0.0, -3.14]
-    max_pose: [0.95, 0.3, 0.45, 0.0, 0.0, 3.14]
+    min_pose: [0.25, -0.3, 0.41, 0.0, 0.0, -3.14]
+    max_pose: [0.7, 0.3, 0.51, 0.0, 0.0, 3.14]
 
   gripper:
-    min_pose: [0.4, -0.0, 0.8, 3.14, 0.0, 0.0]
-    max_pose: [0.4, 0.0, 0.8, 3.14, 0.0, 0.0]
+    min_pose: [0.0, -0.0, 0.8, 3.14, 0.0, 0.0]
+    max_pose: [0.0, 0.0, 0.8, 3.14, 0.0, 0.0]

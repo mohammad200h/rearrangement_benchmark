@@ -2,6 +2,8 @@
 
 import numpy as np
 from ikpy.chain import Chain
+from scipy.spatial.transform import Rotation as R
+from dm_robotics.transformations import transformations as tr
 from dm_robotics.transformations.transformations import mat_to_quat, quat_to_mat, quat_to_euler
 
 import PIL
@@ -46,7 +48,7 @@ class RearrangementTask(object):
         return obs
     
     def pixel_2_world(self, camera_name, coords):
-        """Returns the world coordinates for a given pixel in camera."""
+        """Returns the world coordinates for a given pixel."""
         width, height = [480, 640] # TODO: read from config
         
         # Investigate the mjcf cause I didn't know what the heck was going on with cameras :)
@@ -90,19 +92,24 @@ class RearrangementTask(object):
 
         return world_coords
 
+    def world_2_pixel(self, camera_name, coords):
+        """Returns the pixel coordinates for a given world coordinate."""
+        pass
 
 
-    def move_eef(self, target, max_iters=100):
+    def move_eef(self, target_pose, target_orientation, max_iters=100):
         """Moves the end effector to the target position, while maintaining upright orientation.
 
         Args:
             target: A 3D target position.
         """
+        target_quat = mat_to_quat(target_orientation)
+
         # first get joint target using inverse kinematics
         joint_target = self.ee_chain.inverse_kinematics(
-            target_position = target,
-            target_orientation = [0, 0, -1],
-            orientation_mode = "Z",
+            target_position = target_pose,
+            target_orientation = target_orientation,
+            orientation_mode = "all",
             initial_position = np.array([0.0, 0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785, 0.0]),
             )[1:-1]
     
@@ -118,19 +125,23 @@ class RearrangementTask(object):
         def check_target_reached(target, joint_vals, position_threshold=0.01, orientation_threshold=0.01):
             # perform fk with current joint values
             joint_vals = np.concatenate([np.zeros(1), joint_vals, np.zeros(1)]) # add zeros for dummy joints
-            ee_pos = self.ee_chain.forward_kinematics(
+            ee_pose = self.ee_chain.forward_kinematics(
                 joints = joint_vals,
                 full_kinematics = False,
-                )[:3, 3]
+                )
+            ee_pos = ee_pose[:3, 3]
+            ee_quat = mat_to_quat(ee_pose[:3, :3])
 
             # check cartesian position
-            if np.linalg.norm(ee_pos - target) > position_threshold:
+            if np.linalg.norm(ee_pos - target_pose) > position_threshold:
                 return False
 
-            # TODO: add orientation check
             # check orientation
-            
-            return True
+            elif tr.quat_dist(target_quat/np.linalg.norm(target_quat), ee_quat/np.linalg.norm(ee_quat)) > 0.018:
+                return False
+            # return target reached
+            else:
+                return True
 
         iters = 0
         target_reached = False
@@ -138,7 +149,7 @@ class RearrangementTask(object):
             iters += 1
             obs = self._sim.step(joint_target)
             joint_vals = obs[3]["franka_emika_panda_joint_pos"]
-            target_reached = check_target_reached(target, joint_vals) 
+            target_reached = check_target_reached(target_pose, joint_vals) 
         
         self.update_internal_vars(obs)
         if target_reached:
@@ -165,9 +176,49 @@ class RearrangementTask(object):
         self.update_internal_vars(obs)
         return obs
 
-    def pick(self):
+    def pick(self, object_name):
         """Picks up an object."""
-        pass
+        obj_pose = self.props[object_name]["position"]
+        obj_quat = self.props[object_name]["orientation"]
+        
+        # generate grasp poses for object
+        pre_grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.5])
+        grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.2])
+
+        # generate grasp orientation
+        obj_rot = R.from_quat(obj_quat)
+        obj_rot_mat = obj_rot.as_matrix()
+        obj_rot_z = np.rad2deg(np.arctan2(obj_rot_mat[1,0], obj_rot_mat[0,0]))
+        # double check the -45 term
+        grasp_mat = R.from_euler('xyz', [0, 180, obj_rot_z-45], degrees=True).as_matrix()
+
+
+        # display side rgb
+        rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
+        PIL.Image.fromarray(rgb).show()
+
+        # pre-grasp pose
+        status, obs = self.move_eef(pre_grasp_pose, grasp_mat)
+        # display side rgb
+        rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
+        PIL.Image.fromarray(rgb).show()
+        
+        # grasp pose
+        status, obs = self.move_eef(grasp_pose, grasp_mat)
+        # display side rgb
+        rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
+        PIL.Image.fromarray(rgb).show()
+
+        # close gripper
+        self.close_gripper()
+
+        # lift object
+        status, obs = self.move_eef(pre_grasp_pose, grasp_mat)
+        # display side rgb
+        rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
+        PIL.Image.fromarray(rgb).show()
+
+
 
     def place(self):
         """Places an object."""
@@ -211,7 +262,7 @@ class RearrangementTask(object):
        # get object information
        prop_positions = self._sim.physics.named.data.geom_xpos[prop_names]
        prop_orientations = self._sim.physics.named.data.geom_xmat[prop_names]
-       prop_orientations = [mat_to_quat(mat.reshape((3, 3))) for mat in prop_orientations]
+       prop_orientations = [R.from_matrix(mat.reshape((3, 3))).as_quat() for mat in prop_orientations]
        prop_rgba = self._sim.physics.named.model.geom_rgba[prop_names]
        prop_names = [name.split("/")[0] for name in prop_names]
 

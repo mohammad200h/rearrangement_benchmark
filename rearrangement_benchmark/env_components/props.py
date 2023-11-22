@@ -39,7 +39,7 @@ class Rectangle(Prop):
         prop_root = mjcf_root.worldbody.add("body", name="prop_root")
         box = prop_root.add(
             "geom",
-            name="body",
+            name=name,
             type="box",
             pos=pos,
             size=(x_len, y_len, z_len),
