@@ -34,7 +34,7 @@ if __name__=="__main__":
     cv2.waitKey(10)
 
     # debug pixel_se2
-    world_coords = task.pixel_se2("overhead_camera", [280,320])
+    world_coords = task.pixel_2_world("overhead_camera", [280,320])
     world_coords += np.array([0,0,0.3])
 
     status, obs = task.move_eef(world_coords)
