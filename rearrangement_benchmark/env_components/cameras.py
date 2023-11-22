@@ -29,9 +29,6 @@ def _make_fixed_camera(
         quat=quat,
         fovy=fovy,
     )
-    print(mjcf_root)
-    print(prop_root)
-    print(camera)
 
     return mjcf_root, camera
 
