@@ -45,9 +45,9 @@ class Rectangle(Prop):
             size=(x_len, y_len, z_len),
             solref=solref,
             solimp=solimp,
-            condim=1,
+            condim=3,
             rgba=rgba,
-            mass = 500,
+            mass = 10,
             friction = "10 10 10"
         )
         site = prop_root.add(

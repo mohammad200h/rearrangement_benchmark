@@ -24,7 +24,7 @@ from omegaconf import DictConfig
 def build_arena(name: str) -> composer.Arena:
     """Build a MuJoCo arena."""
     arena = empty.Arena(name=name)
-    arena.mjcf_model.option.timestep = 0.001
+    arena.mjcf_model.option.timestep = 0.005
     arena.mjcf_model.option.gravity = (0.0, 0.0, -1.0)
     arena.mjcf_model.size.nconmax = 1000
     arena.mjcf_model.size.njmax = 2000

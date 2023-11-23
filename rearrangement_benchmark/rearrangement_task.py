@@ -99,7 +99,7 @@ class RearrangementTask(object):
 
         return image_coords
 
-    def move_eef(self, target_pose, target_orientation, max_iters=100):
+    def move_eef(self, target_pose, target_orientation, max_iters=10000):
         """Moves the end effector to the target position, while maintaining upright orientation.
 
         Args:
@@ -164,8 +164,8 @@ class RearrangementTask(object):
     def open_gripper(self):
         """Opens the gripper."""
         self.gripper_status = "open"
-        joint_target = np.concatenate([self.joint_angles, np.array([-255.0])])
-        for i in range(10):
+        joint_target = np.concatenate([self.joint_angles, np.array([-50.0])])
+        for i in range(500):
             obs = self._sim.step(joint_target)
         self.update_internal_vars(obs)
         return obs
@@ -173,8 +173,8 @@ class RearrangementTask(object):
     def close_gripper(self):
         """Closes the gripper."""
         self.gripper_status = "closed"
-        joint_target = np.concatenate([self.joint_angles, np.array([255.0])])
-        for i in range(10):
+        joint_target = np.concatenate([self.joint_angles, np.array([50.0])])
+        for i in range(500):
             obs = self._sim.step(joint_target)
         self.update_internal_vars(obs)
         return obs
@@ -186,7 +186,7 @@ class RearrangementTask(object):
         
         # generate grasp poses for object
         pre_grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.5])
-        grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.1])
+        grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.175])
 
         # generate grasp orientation
         obj_rot = R.from_quat(obj_quat)

@@ -18,8 +18,8 @@ if __name__=="__main__":
     task = RearrangementTask(cfg = TRANSPORTER_CONFIG)
     obs = task.reset()
     
-    import time 
-    time.sleep(1)
+    #import mujoco 
+    #mujoco.viewer.launch(task._sim.physics.model._model, task._sim.physics.data._data)
 
     # get the pose of a random object
     objects = task.props.keys()
