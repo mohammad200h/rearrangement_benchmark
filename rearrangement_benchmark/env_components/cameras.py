@@ -94,7 +94,7 @@ def add_camera(
 
     # create camera sensors
     camera_config = CameraConfig(
-        width=width, height=height, fovy=fovy, has_rgb=True, has_depth=True, has_segmentation=True, render_shadows=False
+        width=width, height=height, fovy=fovy, has_rgb=True, has_depth=True, has_segmentation=False, render_shadows=False
     )
 
     # TODO: investigate, strangely find_all and find result in different results

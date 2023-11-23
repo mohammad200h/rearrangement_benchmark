@@ -79,8 +79,13 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
             min_pose_bounds=np.array(cfg.task.initializers.workspace.min_pose),
             max_pose_bounds=np.array(cfg.task.initializers.workspace.max_pose),
         )
+
+        def position_prop(physics, pos, quat, random_state):
+            del random_state
+            prop.set_pose(physics, pos, quat)
+    
         initialize_prop = entity_initializer.PoseInitializer(
-            initializer_fn=prop.set_pose, pose_sampler=prop_pose_dist.sample_pose
+            initializer_fn=position_prop, pose_sampler=prop_pose_dist.sample_pose
         )
         initializers.append(initialize_prop)
 

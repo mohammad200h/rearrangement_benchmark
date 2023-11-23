@@ -18,6 +18,9 @@ if __name__=="__main__":
     task = RearrangementTask(cfg = TRANSPORTER_CONFIG)
     obs = task.reset()
     
+    import time 
+    time.sleep(1)
+
     # get the pose of a random object
     objects = task.props.keys()
     obj = list(objects)[0]
@@ -32,3 +35,4 @@ if __name__=="__main__":
     task.pick(obj)
 
     # test place action
+    task.place([0.6, 0.0, 0.3])

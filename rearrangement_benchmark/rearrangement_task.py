@@ -1,6 +1,7 @@
 """A high-level task API for rearrangement tasks that leverage motion planning."""
 
 import numpy as np
+from mujoco import viewer
 from ikpy.chain import Chain
 from scipy.spatial.transform import Rotation as R
 from dm_robotics.transformations import transformations as tr
@@ -23,7 +24,8 @@ class RearrangementTask(object):
             self._sim, self.config = construct_task_env(cfg)
         else:
             self._sim, self.config = construct_task_env()
-
+        
+        self.viewer = None
         self.shapes = self.config.props.shapes
         self.ee_chain = Chain.from_urdf_file(URDF_PATH, base_elements=["panda_link0"]) # TODO: read from config
 
@@ -34,6 +36,7 @@ class RearrangementTask(object):
 
     def __del__(self):
         """Cleans up the task."""
+        del self.viewer
         self._sim.close()
 
     def update_internal_vars(self, obs):
@@ -45,33 +48,18 @@ class RearrangementTask(object):
         """Resets the task."""
         obs = self._sim.reset()
         self.update_internal_vars(obs)
+        self.viewer = viewer.launch_passive(self._sim.physics.model._model, self._sim.physics.data._data)
         return obs
     
     def pixel_2_world(self, camera_name, coords):
         """Returns the world coordinates for a given pixel."""
         width, height = [480, 640] # TODO: read from config
-        
-        # Investigate the mjcf cause I didn't know what the heck was going on with cameras :)
-        #from dm_control.mjcf import export_with_assets
-        #mjcf_model = self._sim._env._task.root_entity.mjcf_model
-        #export_with_assets(mjcf_model, ".", "test.xml")
 
         # get camera parameters
         # Note: MoMa employs opencv camera convention where +z faces the scene
         # this is different from mujoco where -z faces the scene
         # this was confusing on first pass over both APIs
         intrinsics = self.obs[3][camera_name + "_intrinsics"]
-        
-        # manually calculate the intrinsics as a sanity check!!!
-        #mj_fovy = self._sim._env.physics.named.model.cam_fovy["overhead_camera/overhead_camera"]
-        #half_angle_rad = np.deg2rad(mj_fovy / 2.0)
-        #focal_length = (height / 2.0) / np.tan(half_angle_rad)
-        #intrinsics = np.array([
-        #    [focal_length, 0.0, (width-1) / 2.0, 0.0], 
-        #    [0.0, focal_length, (height-1) / 2.0, 0.0], 
-        #    [0.0, 0.0, 1.0, 0.0]
-        #    ])
-        #print("intrinsics: {}".format(intrinsics[:3,:3]))
         
         # get camera position and orientation (from MoMa's perspective)
         pos = self.obs[3][camera_name + "_pos"]
@@ -104,15 +92,12 @@ class RearrangementTask(object):
         camera_to_world[:3, 3] = pos
         camera_coords = camera_to_world @ np.concatenate([coords, np.ones(1)])
         camera_coords = camera_coords[:3] / camera_coords[3]
-        print("camera_coords: {}".format(camera_coords))
 
         # convert camera coordinates to image coordinates
         image_coords = intrinsics[:3, :3] @ camera_coords
         image_coords = image_coords[:2] / image_coords[2]
-        print("image_coords: {}".format(image_coords))
 
         return image_coords
-
 
     def move_eef(self, target_pose, target_orientation, max_iters=100):
         """Moves the end effector to the target position, while maintaining upright orientation.
@@ -165,6 +150,7 @@ class RearrangementTask(object):
         while (not target_reached) or (iters < max_iters):
             iters += 1
             obs = self._sim.step(joint_target)
+            self.viewer.sync()
             joint_vals = obs[3]["franka_emika_panda_joint_pos"]
             target_reached = check_target_reached(target_pose, joint_vals) 
         
@@ -200,7 +186,7 @@ class RearrangementTask(object):
         
         # generate grasp poses for object
         pre_grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.5])
-        grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.2])
+        grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.1])
 
         # generate grasp orientation
         obj_rot = R.from_quat(obj_quat)
@@ -212,19 +198,16 @@ class RearrangementTask(object):
 
         # display side rgb
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
-        PIL.Image.fromarray(rgb).show()
 
         # pre-grasp pose
         status, obs = self.move_eef(pre_grasp_pose, grasp_mat)
         # display side rgb
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
-        PIL.Image.fromarray(rgb).show()
         
         # grasp pose
         status, obs = self.move_eef(grasp_pose, grasp_mat)
         # display side rgb
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
-        PIL.Image.fromarray(rgb).show()
 
         # close gripper
         self.close_gripper()
@@ -233,14 +216,31 @@ class RearrangementTask(object):
         status, obs = self.move_eef(pre_grasp_pose, grasp_mat)
         # display side rgb
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
-        PIL.Image.fromarray(rgb).show()
 
-
-
-    def place(self):
+    def place(self, coord):
         """Places an object."""
-        pass
+        place_pose = coord
+        preplace_pose = np.array([coord[0], coord[1], 0.5])
+        grasp_mat = R.from_euler('xyz', [0, 180, 0], degrees=True).as_matrix()
 
+        # go to pre-place pose
+        self.move_eef(preplace_pose, grasp_mat)
+        rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
+
+        # go to place pose
+        self.move_eef(place_pose, grasp_mat)
+        rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
+
+        # open gripper
+        self.open_gripper()
+        rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
+
+        # go to pre-place pose
+        self.move_eef(preplace_pose, grasp_mat)
+        rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
+
+        # go to default pose
+        
     def transporter_pick(self):
         """Picks up an object using the transporter."""
         pass
@@ -248,18 +248,6 @@ class RearrangementTask(object):
     def transporter_place(self):
         """Places an object using the transporter."""
         pass
-    
-    def display_cameras(self):
-        """Displays the current camera images."""
-        # TODO: generalize this to any number of cameras
-        front_camera = obs[3]["front_camera_rgb_img"].astype(np.uint8)
-        PIL.Image.fromarray(front_camera).show()
-        overhead_camera = obs[3]["overhead_camera_rgb_img"].astype(np.uint8)
-        PIL.Image.fromarray(overhead_camera).show()
-        left_camera = obs[3]["left_camera_rgb_img"].astype(np.uint8)
-        PIL.Image.fromarray(left_camera).show()
-        right_camera = obs[3]["right_camera_rgb_img"].astype(np.uint8)
-        PIL.Image.fromarray(right_camera).show()
     
     @property
     def props(self) -> dict:
