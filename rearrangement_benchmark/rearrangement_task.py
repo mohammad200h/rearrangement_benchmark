@@ -94,7 +94,24 @@ class RearrangementTask(object):
 
     def world_2_pixel(self, camera_name, coords):
         """Returns the pixel coordinates for a given world coordinate."""
-        pass
+        intrinsics = self.obs[3][camera_name + "_intrinsics"]
+        pos = self.obs[3][camera_name + "_pos"]
+        quat = self.obs[3][camera_name + "_quat"]
+
+        # convert world coordinates to camera coordinates
+        camera_to_world = np.eye(4)
+        camera_to_world[:3, :3] = quat_to_mat(quat)[:3,:3]
+        camera_to_world[:3, 3] = pos
+        camera_coords = camera_to_world @ np.concatenate([coords, np.ones(1)])
+        camera_coords = camera_coords[:3] / camera_coords[3]
+        print("camera_coords: {}".format(camera_coords))
+
+        # convert camera coordinates to image coordinates
+        image_coords = intrinsics[:3, :3] @ camera_coords
+        image_coords = image_coords[:2] / image_coords[2]
+        print("image_coords: {}".format(image_coords))
+
+        return image_coords
 
 
     def move_eef(self, target_pose, target_orientation, max_iters=100):
