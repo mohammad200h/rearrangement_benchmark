@@ -17,15 +17,16 @@ URDF_PATH = "./models/arms/robot.urdf"
 class RearrangementTask(object):
     """A high-level API for performing rearrangement tasks."""
 
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, viewer=True):
         """Initializes a rearrangement task."""
         # if a config is provided overwrite the default config
         if cfg is not None:
             self._sim, self.config = construct_task_env(cfg)
         else:
             self._sim, self.config = construct_task_env()
-        
-        self.viewer = None
+        self.viewer_flag = viewer
+        if self.viewer_flag:
+            self.viewer = None
         self.shapes = self.config.props.shapes
         self.ee_chain = Chain.from_urdf_file(URDF_PATH, base_elements=["panda_link0"]) # TODO: read from config
 
@@ -36,7 +37,8 @@ class RearrangementTask(object):
 
     def __del__(self):
         """Cleans up the task."""
-        del self.viewer
+        if self.viewer_flag:
+            del self.viewer
         self._sim.close()
 
     def update_internal_vars(self, obs):
@@ -48,7 +50,8 @@ class RearrangementTask(object):
         """Resets the task."""
         obs = self._sim.reset()
         self.update_internal_vars(obs)
-        self.viewer = viewer.launch_passive(self._sim.physics.model._model, self._sim.physics.data._data)
+        if self.viewer_flag:
+            self.viewer = viewer.launch_passive(self._sim.physics.model._model, self._sim.physics.data._data)
         return obs
     
     def pixel_2_world(self, camera_name, coords):
@@ -99,22 +102,31 @@ class RearrangementTask(object):
 
         return image_coords
 
-    def move_eef(self, target_pose, target_orientation, max_iters=10000):
+    def move_eef(self, target_pose, target_orientation, max_iters=500):
         """Moves the end effector to the target position, while maintaining upright orientation.
 
         Args:
             target: A 3D target position.
         """
+        print("target pose: ", target_pose)
+        print("target orientation: ", target_orientation)
+
+        iters = 0
+        target_reached = False
+        joint_velocities = []
+        joint_positions = []
         target_quat = mat_to_quat(target_orientation)
 
         # first get joint target using inverse kinematics
+        # TODO: change initial position to current joint state
         joint_target = self.ee_chain.inverse_kinematics(
             target_position = target_pose,
             target_orientation = target_orientation,
             orientation_mode = "all",
             initial_position = np.array([0.0, 0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785, 0.0]),
             )[1:-1]
-    
+        print("joint target: ", joint_target)
+
         # include the gripper status in the command
         if self.gripper_status == "open":
             joint_target = np.concatenate([joint_target, np.array([-255.0])])
@@ -124,7 +136,7 @@ class RearrangementTask(object):
             raise ValueError("Invalid gripper status: {}".format(self.gripper_status))
 
         # step the sim env until within a certain threshold of the target position
-        def check_target_reached(target, joint_vals, position_threshold=0.01, orientation_threshold=0.01):
+        def check_target_reached(target, joint_vals, position_threshold=0.01, orientation_threshold=0.5):
             # perform fk with current joint values
             joint_vals = np.concatenate([np.zeros(1), joint_vals, np.zeros(1)]) # add zeros for dummy joints
             ee_pose = self.ee_chain.forward_kinematics(
@@ -135,47 +147,76 @@ class RearrangementTask(object):
             ee_quat = mat_to_quat(ee_pose[:3, :3])
 
             # check cartesian position
-            if np.linalg.norm(ee_pos - target_pose) > position_threshold:
-                return False
-
+            linear_dist = np.linalg.norm(ee_pos - target)
             # check orientation
-            elif tr.quat_dist(target_quat/np.linalg.norm(target_quat), ee_quat/np.linalg.norm(ee_quat)) > 0.018:
+            angular_dist = tr.quat_dist(target_quat/np.linalg.norm(target_quat), ee_quat/np.linalg.norm(ee_quat))
+            print("linear_dist: {}".format(linear_dist))
+            print("angular_dist: {}".format(angular_dist))
+            
+            if (linear_dist > position_threshold) or (angular_dist > orientation_threshold):
                 return False
-            # return target reached
             else:
                 return True
 
-        iters = 0
-        target_reached = False
-        while (not target_reached) or (iters < max_iters):
+        #for target in joint_targets:
+        while (not target_reached) and (iters < max_iters):
+            print("iters: {}".format(iters))
             iters += 1
             obs = self._sim.step(joint_target)
-            self.viewer.sync()
             joint_vals = obs[3]["franka_emika_panda_joint_pos"]
-            target_reached = check_target_reached(target_pose, joint_vals) 
+            joint_positions.append(joint_vals)   
+            joint_velocities.append(obs[3]["franka_emika_panda_joint_vel"])
+            #target_reached = joint_target_reached(joint_vals, target)
+            target_reached = check_target_reached(target_pose, joint_vals)
+            print("target_reached: {}".format(target_reached))
+            print("while condition: {}".format((not target_reached) or (iters < max_iters)))
+            if self.viewer_flag:
+                self.viewer.sync()
         
         self.update_internal_vars(obs)
         if target_reached:
+            # plot joint positions vs target
+            # make separate plot on grid for each joint
+            joint_positions = np.array(joint_positions)
+            import matplotlib.pyplot as plt
+            fig, axes = plt.subplots(2, 4)
+            for i in range(7):
+                axes[i//4, i%4].plot(joint_positions[:, i])
+                axes[i//4, i%4].axhline(y=joint_target[i], color="r", linestyle="--")
+                axes[i//4, i%4].set_title("Joint Positions {}".format(i+1))
+            plt.show()
+
+            # plot the joint velocities
+            joint_velocities = np.array(joint_velocities)
+            fig, axes = plt.subplots(2, 4)
+            for i in range(7):
+                axes[i//4, i%4].plot(joint_velocities[:, i])
+                axes[i//4, i%4].set_title("Joint Velocities {}".format(i+1))
+            plt.show()
+
             return True, obs
 
+        #self.viewer.sync()
         return False, None
         
 
     def open_gripper(self):
         """Opens the gripper."""
         self.gripper_status = "open"
-        joint_target = np.concatenate([self.joint_angles, np.array([-50.0])])
-        for i in range(500):
+        joint_target = np.concatenate([self.joint_angles, np.array([-255.0])])
+        for i in range(2000):
             obs = self._sim.step(joint_target)
+            self.viewer.sync()
         self.update_internal_vars(obs)
         return obs
 
     def close_gripper(self):
         """Closes the gripper."""
         self.gripper_status = "closed"
-        joint_target = np.concatenate([self.joint_angles, np.array([50.0])])
-        for i in range(500):
+        joint_target = np.concatenate([self.joint_angles, np.array([255.0])])
+        for i in range(2000):
             obs = self._sim.step(joint_target)
+            self.viewer.sync()
         self.update_internal_vars(obs)
         return obs
 
@@ -185,8 +226,9 @@ class RearrangementTask(object):
         obj_quat = self.props[object_name]["orientation"]
         
         # generate grasp poses for object
-        pre_grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.5])
-        grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.175])
+        pre_grasp_pose = np.array([obj_pose[0], obj_pose[1], 0.6])
+        grasp_pose = np.copy(pre_grasp_pose)
+        grasp_pose[2] = 0.2
 
         # generate grasp orientation
         obj_rot = R.from_quat(obj_quat)
@@ -200,11 +242,13 @@ class RearrangementTask(object):
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
 
         # pre-grasp pose
+        print("pre_grasp_pose: {}".format(pre_grasp_pose))
         status, obs = self.move_eef(pre_grasp_pose, grasp_mat)
         # display side rgb
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
         
         # grasp pose
+        print("grasp_pose: {}".format(grasp_pose))
         status, obs = self.move_eef(grasp_pose, grasp_mat)
         # display side rgb
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)

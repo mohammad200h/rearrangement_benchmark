@@ -4,4 +4,4 @@ defaults:
   - props: default
   - cameras: default
   - robots: default
-  - task: default
+  - task: tuning

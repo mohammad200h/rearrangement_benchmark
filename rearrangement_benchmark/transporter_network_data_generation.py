@@ -15,7 +15,7 @@ from hydra import compose, initialize
 TRANSPORTER_CONFIG = compose(config_name="transporter_data_collection")
 
 if __name__=="__main__":
-    task = RearrangementTask(cfg = TRANSPORTER_CONFIG)
+    task = RearrangementTask(cfg = TRANSPORTER_CONFIG, viewer=True)
     obs = task.reset()
     
     #import mujoco 
@@ -26,13 +26,15 @@ if __name__=="__main__":
     obj = list(objects)[0]
 
     # debug pixel_se2
-    world_coords = task.pixel_2_world("overhead_camera", [280,320])
-    print("world_coords: ", world_coords)
-    image_coords = task.world_2_pixel("overhead_camera", world_coords)
-    print("image_coords: ", image_coords)
+    #world_coords = task.pixel_2_world("overhead_camera", [280,320])
+    #print("world_coords: ", world_coords)
+    #image_coords = task.world_2_pixel("overhead_camera", world_coords)
+    #print("image_coords: ", image_coords)
 
     # test pick action
     task.pick(obj)
+    print("pick action done")
 
     # test place action
     task.place([0.6, 0.0, 0.3])
+    print("place action done")

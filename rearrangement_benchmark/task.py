@@ -39,7 +39,7 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
         props=scene_components["props"],
         extra_sensors=scene_components["extra_sensors"],
         extra_effectors=[],
-        control_timestep=0.1,
+        control_timestep=0.005,
         scene_initializer=lambda _: None,
         episode_initializer=lambda _: None,
     )
@@ -131,6 +131,8 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
     # currently choosing zeros for position control results in a validation error
     if cfg.robots.arm.actuator_config.type == "general":  # in this case general is position control
         noop_action = np.array([0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785, 0.0], dtype=np.float32)
+    elif cfg.robots.arm.actuator_config.type == "velocity":
+        noop_action = np.zeros(parent_action_spec.shape, dtype=np.float32)
     elif cfg.robots.arm.actuator_config.type == "motor":
         noop_action = af.spec_utils.zeros(parent_action_spec)
     else:
