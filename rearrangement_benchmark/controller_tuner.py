@@ -22,7 +22,7 @@ URDF_PATH = "./models/arms/robot.urdf"
 class ControllerTuner(object):
     """A high-level API for tuning controllers."""
 
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, pid_controllers=None):
         """Initializes a rearrangement task."""
         # if a config is provided overwrite the default config
         if cfg is not None:
@@ -36,15 +36,18 @@ class ControllerTuner(object):
         self.obs = None
 
         # define pid controllers 
-        self.pid_controllers = {}
-        self.pid_controllers["joint_1"] = PID(0.0, 0.0, 0.0, setpoint=0)
-        self.pid_controllers["joint_2"] = PID(0.0, 0.0, 0.0, setpoint=-np.pi/4)
-        self.pid_controllers["joint_3"] = PID(0.0, 0.0, 0.0, setpoint=0)
-        self.pid_controllers["joint_4"] = PID(0.0, 0.0, 0.0, setpoint=-3*np.pi/4)
-        self.pid_controllers["joint_5"] = PID(0.0, 0.0, 0.0, setpoint=0)
-        self.pid_controllers["joint_6"] = PID(0.0, 0.0, 0.0, setpoint=np.pi/2)
-        self.pid_controllers["joint_7"] = PID(0.0, 0.0, 0.0, setpoint=np.pi/4)
-        
+        if pid_controllers is None:
+            self.pid_controllers = {}
+            self.pid_controllers["joint_1"] = PID(100.0, 0.0, 0.0, setpoint=0)
+            self.pid_controllers["joint_2"] = PID(0.0, 0.0, 0.0, setpoint=-np.pi/4)
+            self.pid_controllers["joint_3"] = PID(0.0, 0.0, 0.0, setpoint=0)
+            self.pid_controllers["joint_4"] = PID(0.0, 0.0, 0.0, setpoint=-3*np.pi/4)
+            self.pid_controllers["joint_5"] = PID(0.0, 0.0, 0.0, setpoint=0)
+            self.pid_controllers["joint_6"] = PID(0.0, 0.0, 0.0, setpoint=np.pi/2)
+            self.pid_controllers["joint_7"] = PID(0.0, 0.0, 0.0, setpoint=np.pi/4)
+        else:
+            self.pid_controllers = pid_controllers
+
         # set pid time step
         for pid in self.pid_controllers.values():
             pid.sample_time = 0.001
