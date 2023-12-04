@@ -11,3 +11,6 @@
 [submodule "rearrangement_benchmark/vcp"]
 	path = rearrangement_benchmark/vcp
 	url = git@github.com:peterdavidfagan/vcp.git
+[submodule "rearrangement_benchmark/mujoco_controllers"]
+	path = rearrangement_benchmark/mujoco_controllers
+	url = git@github.com:peterdavidfagan/mujoco_controllers.git
