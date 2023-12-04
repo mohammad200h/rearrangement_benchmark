@@ -67,11 +67,11 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
         min_pose_bounds=np.array(cfg.task.initializers.gripper.min_pose),
         max_pose_bounds=np.array(cfg.task.initializers.gripper.max_pose),
     )
-    initialize_arm = entity_initializer.PoseInitializer(
-        initializer_fn=robot.position_gripper,
-        pose_sampler=gripper_pose_dist.sample_pose,
-    )
-    initializers.append(initialize_arm)
+    #initialize_arm = entity_initializer.PoseInitializer(
+    #    initializer_fn=robot.position_gripper,
+    #    pose_sampler=gripper_pose_dist.sample_pose,
+    #)
+    #initializers.append(initialize_arm)
 
     # prop initializers
     for prop in scene_components["props"]:
@@ -130,6 +130,7 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
     # TODO: fix this logic based on selected control interface (e.g. position, velocity, torque)
     # currently choosing zeros for position control results in a validation error
     if cfg.robots.arm.actuator_config.type == "general":  # in this case general is position control
+        #noop_action = np.zeros(parent_action_spec.shape, dtype=np.float32)
         noop_action = np.array([0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785, 0.0], dtype=np.float32)
     elif cfg.robots.arm.actuator_config.type == "velocity":
         noop_action = np.zeros(parent_action_spec.shape, dtype=np.float32)
