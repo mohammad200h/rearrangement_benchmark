@@ -1,6 +1,7 @@
 """A high-level task API for rearrangement tasks that leverage motion planning."""
 
 import numpy as np
+import mujoco
 from mujoco import viewer
 from ikpy.chain import Chain
 from scipy.spatial.transform import Rotation as R
@@ -33,6 +34,7 @@ class RearrangementTask(object):
         # current status of the robot
         self.gripper_status = "open"
         self.joint_angles = None 
+        self.joint_velocities = None
         self.obs = None
 
     def __del__(self):
@@ -43,8 +45,9 @@ class RearrangementTask(object):
 
     def update_internal_vars(self, obs):
         """Updates internal variables based on the observation."""
-        self.joint_angles = obs[3]["franka_emika_panda_joint_pos"]
         self.obs = obs
+        self.joint_angles = self.obs[3]["franka_emika_panda_joint_pos"]
+        self.joint_velocities = self.obs[3]["franka_emika_panda_joint_vel"]
     
     def reset(self):
         """Resets the task."""
@@ -102,122 +105,121 @@ class RearrangementTask(object):
 
         return image_coords
 
-    def move_eef(self, target_pose, target_orientation, max_iters=500):
+    def move_eef(self, target_pose, target_orientation, duration=5.0):
         """Moves the end effector to the target position, while maintaining upright orientation.
 
         Args:
             target: A 3D target position.
         """
-        print("target pose: ", target_pose)
-        print("target orientation: ", target_orientation)
-
-        iters = 0
         target_reached = False
-        joint_velocities = []
-        joint_positions = []
-        target_quat = mat_to_quat(target_orientation)
+       
+        # Generate joint target via IK
+        current_joint_angles = self.joint_angles
+        current_joint_angles = np.concatenate([np.array([0.0]), current_joint_angles, np.array([0.0])]) # required format for ikpy
 
-        # first get joint target using inverse kinematics
-        # TODO: change initial position to current joint state
+        target_quat = mat_to_quat(target_orientation)
         joint_target = self.ee_chain.inverse_kinematics(
             target_position = target_pose,
             target_orientation = target_orientation,
             orientation_mode = "all",
-            initial_position = np.array([0.0, 0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785, 0.0]),
+            initial_position = current_joint_angles,
             )[1:-1]
-        print("joint target: ", joint_target)
 
-        # include the gripper status in the command
-        if self.gripper_status == "open":
-            joint_target = np.concatenate([joint_target, np.array([-255.0])])
-        elif self.gripper_status == "closed":
-            joint_target = np.concatenate([joint_target, np.array([255.0])])
-        else:
-            raise ValueError("Invalid gripper status: {}".format(self.gripper_status))
+        start_time = self._sim.physics.data.time
+        while (not target_reached) and (self._sim.physics.data.time - start_time < duration):
+            # get current joint values
+            current_joint_position = self._sim.physics.data.qpos[:7]
+            current_joint_velocity = self._sim.physics.data.qvel[:7]
 
-        # step the sim env until within a certain threshold of the target position
-        def check_target_reached(target, joint_vals, position_threshold=0.01, orientation_threshold=0.5):
-            # perform fk with current joint values
-            joint_vals = np.concatenate([np.zeros(1), joint_vals, np.zeros(1)]) # add zeros for dummy joints
-            ee_pose = self.ee_chain.forward_kinematics(
-                joints = joint_vals,
-                full_kinematics = False,
-                )
-            ee_pos = ee_pose[:3, 3]
-            ee_quat = mat_to_quat(ee_pose[:3, :3])
+            # calculate joint torques
+            torques = self.pd_control(
+                target_joint_angles = joint_target,
+                target_joint_velocities = np.zeros(7),
+                current_joint_angles = current_joint_position,
+                current_joint_velocities = current_joint_velocity,
+                    )
 
-            # check cartesian position
-            linear_dist = np.linalg.norm(ee_pos - target)
-            # check orientation
-            angular_dist = tr.quat_dist(target_quat/np.linalg.norm(target_quat), ee_quat/np.linalg.norm(ee_quat))
-            print("linear_dist: {}".format(linear_dist))
-            print("angular_dist: {}".format(angular_dist))
-            
-            if (linear_dist > position_threshold) or (angular_dist > orientation_threshold):
-                return False
+            # include the gripper status in the command
+            if self.gripper_status == "open":
+                command = np.concatenate([torques, np.array([-255.0])])
+            elif self.gripper_status == "closed":
+                command = np.concatenate([torques, np.array([255.0])])
             else:
-                return True
-
-        #for target in joint_targets:
-        while (not target_reached) and (iters < max_iters):
-            print("iters: {}".format(iters))
-            iters += 1
-            obs = self._sim.step(joint_target)
-            joint_vals = obs[3]["franka_emika_panda_joint_pos"]
-            joint_positions.append(joint_vals)   
-            joint_velocities.append(obs[3]["franka_emika_panda_joint_vel"])
-            #target_reached = joint_target_reached(joint_vals, target)
-            target_reached = check_target_reached(target_pose, joint_vals)
-            print("target_reached: {}".format(target_reached))
-            print("while condition: {}".format((not target_reached) or (iters < max_iters)))
+                raise ValueError("Invalid gripper status: {}".format(self.gripper_status))
+            
+            # step simulation env
+            obs = self._sim.step(command)
+            self.update_internal_vars(obs)
+            target_reached = self.check_target_reached(target_pose, target_quat, self.joint_angles)
             if self.viewer_flag:
                 self.viewer.sync()
-        
-        self.update_internal_vars(obs)
+       
         if target_reached:
-            # plot joint positions vs target
-            # make separate plot on grid for each joint
-            joint_positions = np.array(joint_positions)
-            import matplotlib.pyplot as plt
-            fig, axes = plt.subplots(2, 4)
-            for i in range(7):
-                axes[i//4, i%4].plot(joint_positions[:, i])
-                axes[i//4, i%4].axhline(y=joint_target[i], color="r", linestyle="--")
-                axes[i//4, i%4].set_title("Joint Positions {}".format(i+1))
-            plt.show()
+            return True
+        else:
+            return False
 
-            # plot the joint velocities
-            joint_velocities = np.array(joint_velocities)
-            fig, axes = plt.subplots(2, 4)
-            for i in range(7):
-                axes[i//4, i%4].plot(joint_velocities[:, i])
-                axes[i//4, i%4].set_title("Joint Velocities {}".format(i+1))
-            plt.show()
+    def check_target_reached(self, target_pose, target_quat, joint_vals, position_threshold=0.01, orientation_threshold=0.5):
+        # calculate end effector pose
+        joint_vals = np.concatenate([np.zeros(1), joint_vals, np.zeros(1)]) # add zeros for dummy joints
+        ee_pose = self.ee_chain.forward_kinematics(
+            joints = joint_vals,
+            full_kinematics = False,
+            )
+        ee_pos = ee_pose[:3, 3]
+        ee_quat = mat_to_quat(ee_pose[:3, :3])
 
-            return True, obs
-
-        #self.viewer.sync()
-        return False, None
+        # calculate distance to target
+        linear_dist = np.linalg.norm(ee_pos - target_pose)
+        angular_dist = tr.quat_dist(target_quat/np.linalg.norm(target_quat), ee_quat/np.linalg.norm(ee_quat))
         
+        # check if target reached
+        if (linear_dist > position_threshold) or (angular_dist > orientation_threshold):
+            return False
+        else:
+            return True
+        
+    # TODO: move to independent class
+    def pd_control(self, target_joint_angles, target_joint_velocities, current_joint_angles, current_joint_velocities, kp=600, kd=400):
+        # calculate target acceleration
+        target_acceleration = kp * (target_joint_angles - current_joint_angles) + kd * (target_joint_velocities - current_joint_velocities)
+        prev = current_joint_velocities.copy()
+        
+        # apply inverse dynamics to get joint torques
+        self._sim.physics.data.qacc[:7] = target_acceleration
+        mujoco.mj_inverse(self._sim.physics.model._model, self._sim.physics.data._data)
+        sol = self._sim.physics.data.qfrc_inverse[:7].copy()
+        self._sim.physics.data.qacc[:7] = prev
 
-    def open_gripper(self):
+        return sol
+
+    def open_gripper(self, duration=2.0):
         """Opens the gripper."""
         self.gripper_status = "open"
         joint_target = np.concatenate([self.joint_angles, np.array([-255.0])])
-        for i in range(2000):
+        start_time = self._sim.physics.data.time
+        while self._sim.physics.data.time - start_time < duration:
             obs = self._sim.step(joint_target)
             self.viewer.sync()
         self.update_internal_vars(obs)
         return obs
 
-    def close_gripper(self):
+    def close_gripper(self, duration=2.0):
         """Closes the gripper."""
         self.gripper_status = "closed"
-        joint_target = np.concatenate([self.joint_angles, np.array([255.0])])
-        for i in range(2000):
-            obs = self._sim.step(joint_target)
+        joint_target = self.joint_angles.copy()
+        start_time = self._sim.physics.data.time
+        while self._sim.physics.data.time - start_time < duration:
+            command = self.pd_control(
+                target_joint_angles = joint_target,
+                target_joint_velocities = np.zeros(7),
+                current_joint_angles = self.joint_angles,
+                current_joint_velocities = self.joint_velocities,
+                )
+            command = np.concatenate([command, np.array([255.0])])
+            obs = self._sim.step(command)
+            self.update_internal_vars(obs)
             self.viewer.sync()
-        self.update_internal_vars(obs)
         return obs
 
     def pick(self, object_name):
@@ -242,14 +244,12 @@ class RearrangementTask(object):
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
 
         # pre-grasp pose
-        print("pre_grasp_pose: {}".format(pre_grasp_pose))
-        status, obs = self.move_eef(pre_grasp_pose, grasp_mat)
+        status = self.move_eef(pre_grasp_pose, grasp_mat)
         # display side rgb
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
         
         # grasp pose
-        print("grasp_pose: {}".format(grasp_pose))
-        status, obs = self.move_eef(grasp_pose, grasp_mat)
+        status = self.move_eef(grasp_pose, grasp_mat)
         # display side rgb
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
 
@@ -257,7 +257,7 @@ class RearrangementTask(object):
         self.close_gripper()
 
         # lift object
-        status, obs = self.move_eef(pre_grasp_pose, grasp_mat)
+        status = self.move_eef(pre_grasp_pose, grasp_mat)
         # display side rgb
         rgb = self.obs[3]["left_camera_rgb_img"].astype(np.uint8)
 

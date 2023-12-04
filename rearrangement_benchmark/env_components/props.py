@@ -47,7 +47,7 @@ class Rectangle(Prop):
             solimp=solimp,
             condim=3,
             rgba=rgba,
-            mass = 10,
+            #mass = 10,
             friction = "10 10 10"
         )
         site = prop_root.add(
@@ -142,7 +142,7 @@ class Cylinder(Prop):
                                  pos=(0, 0, 0),
                                  size=(radius, half_height),
                                  rgba=rgba,
-                                 mass=50
+                                 #mass=50
                                  )
 
         return mjcf_root, cylinder
@@ -213,7 +213,7 @@ class Sphere(Prop):
                                pos=(0, 0, 0),
                                size=(radius,),
                                rgba=rgba,
-                               mass=50,
+                               #mass=50,
                                )
 
         return mjcf_root, sphere

@@ -1,6 +1,6 @@
 arm:
   _target_: rearrangement_benchmark.models.arms.franka_emika.FER
-  relative_robot_mjcf_path: "./mujoco_menagerie/franka_emika_panda/panda_joint1.xml" # relative to scripts directory
+  relative_robot_mjcf_path: "./mujoco_menagerie/franka_emika_panda/panda_nohand.xml" # relative to scripts directory
   actuator_config:
     type: "general"
     default:

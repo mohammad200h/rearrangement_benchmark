@@ -67,11 +67,11 @@ def construct_task_env(cfg: DictConfig = DEFAULT_CONFIG):
         min_pose_bounds=np.array(cfg.task.initializers.gripper.min_pose),
         max_pose_bounds=np.array(cfg.task.initializers.gripper.max_pose),
     )
-    #initialize_arm = entity_initializer.PoseInitializer(
-    #    initializer_fn=robot.position_gripper,
-    #    pose_sampler=gripper_pose_dist.sample_pose,
-    #)
-    #initializers.append(initialize_arm)
+    initialize_arm = entity_initializer.PoseInitializer(
+        initializer_fn=robot.position_gripper,
+        pose_sampler=gripper_pose_dist.sample_pose,
+    )
+    initializers.append(initialize_arm)
 
     # prop initializers
     for prop in scene_components["props"]:
